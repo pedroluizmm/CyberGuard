@@ -1,0 +1,60 @@
+{
+ "kind": "initial_load_via_api",
+ "dataset": "cyberguard-bulk-v1",
+ "seed": 20261109,
+ "source": "cassandra",
+ "target_events": 100000,
+ "run_id": "20261109T144614Z",
+ "finished_at_utc": "2026-11-09T14:47:29.864Z",
+ "chunks_in_target": 100,
+ "chunks_skipped_from_checkpoint": 46,
+ "chunks_completed_this_run": 54,
+ "checkpoint_completed_events": 100000,
+ "events_acknowledged_this_run": 54000,
+ "created": 53305,
+ "reused": 695,
+ "retried_events": 0,
+ "extra_attempts": 0,
+ "uncertain": 0,
+ "wall_seconds": 75.51,
+ "events_per_second": 715.1,
+ "workers": 16,
+ "chunks_in_flight": 2,
+ "max_attempts": 6,
+ "ignore_checkpoint": false,
+ "api_build": "debug",
+ "resources": {
+  "samples": 7,
+  "interval_seconds": 10.0,
+  "containers": {
+   "cyberguard-api-task02": {
+    "max_cpu_percent": 383.6,
+    "avg_cpu_percent": 350.1,
+    "max_mem_mib": 20.2,
+    "mem_limit_mib": 7620.6
+   },
+   "cyberguard-postgresql-1": {
+    "max_cpu_percent": 6.7,
+    "avg_cpu_percent": 1.4,
+    "max_mem_mib": 144.2,
+    "mem_limit_mib": 2048.0
+   },
+   "cyberguard-cassandra-1": {
+    "max_cpu_percent": 839.5,
+    "avg_cpu_percent": 605.3,
+    "max_mem_mib": 3139.6,
+    "mem_limit_mib": 5120.0
+   }
+  },
+  "host_min_available_mib": 366.2,
+  "note": "docker stats CPU% is relative to one vCPU (100% = one core)."
+ },
+ "stopped": false,
+ "interrupted": false,
+ "reasons": [],
+ "notes": [
+  "Includes HTTP, validation, PostgreSQL transaction or Cassandra LWT+batch+reads per event.",
+  "Durability differs: PostgreSQL synchronous_commit=on; Cassandra commitlog_sync=periodic (10s).",
+  "Initial load via API, not a comparative benchmark."
+ ]
+}

@@ -1,0 +1,9 @@
+{
+  "dataset": "cyberguard-task02-sample-v1",
+  "synthetic": true,
+  "logical_events": 24,
+  "alert_events": 9,
+  "expected_cassandra_live_rows": 81,
+  "id_algorithm": "first 16 bytes of SHA256(dataset + ':' + index), UUID v4 bits",
+  "sha256": "b468e448528e6dcdfe12d650c47162025382613b03638e11b403d7eb8e9e4ee1"
+}

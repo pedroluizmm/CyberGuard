@@ -1,0 +1,586 @@
+{
+ "expected_seconds": 3.14,
+ "postgresql": {
+  "export_seconds": 3.1,
+  "events_table_rows": 100024,
+  "dataset_events": 100000,
+  "other_events": 24,
+  "event_registry_rows": 100148,
+  "event_registry_deleted": 124,
+  "devices_rows": 405,
+  "content": {
+   "rows": 100000,
+   "digest": "041fad7bb65d9fd10c843fa1af3a0b4b"
+  }
+ },
+ "cassandra": {
+  "export_seconds": 9.5,
+  "canonical_export_seconds": 5.0,
+  "events_by_id_lifecycle": {
+   "dataset": {
+    "active": 100000
+   },
+   "other": {
+    "deleted": 128,
+    "active": 24
+   }
+  },
+  "projections": {
+   "events_by_device_day": {
+    "rows_in_dataset_window": 100000,
+    "rows_outside_window": 24,
+    "rows": 100000,
+    "digest": "427dceea1087600c2645da66e3b16639"
+   },
+   "events_by_ip_day": {
+    "rows_in_dataset_window": 100000,
+    "rows_outside_window": 24,
+    "rows": 100000,
+    "digest": "a9850c3e3e0ba494b21a06e16164125e"
+   },
+   "alerts_by_severity_day": {
+    "rows_in_dataset_window": 8237,
+    "rows_outside_window": 9,
+    "rows": 8237,
+    "digest": "ab82fd4cb6614680b892317ad6a6400b"
+   }
+  },
+  "dataset_live_rows": 308237,
+  "expected_live_rows": 308237,
+  "partitions_measured": {
+   "events_by_device_day": {
+    "partitions": 6742,
+    "rows": 100000,
+    "p50_rows": 2,
+    "p99_rows": 220,
+    "max_rows": 1218,
+    "max_key": [
+     "ids-sensor-06",
+     "2026-10-27"
+    ]
+   },
+   "events_by_ip_day": {
+    "partitions": 46614,
+    "rows": 100000,
+    "p50_rows": 1,
+    "p99_rows": 17,
+    "max_rows": 1183,
+    "max_key": [
+     "2001:db8:bad:4::6",
+     "2026-10-27"
+    ]
+   },
+   "alerts_by_severity_day": {
+    "partitions": 140,
+    "rows": 8237,
+    "p50_rows": 58,
+    "p99_rows": 125,
+    "max_rows": 146,
+    "max_key": [
+     "3",
+     "2026-10-14"
+    ]
+   }
+  },
+  "content": {
+   "rows": 100000,
+   "digest": "041fad7bb65d9fd10c843fa1af3a0b4b"
+  }
+ },
+ "queries": [
+  {
+   "name": "q1_hot_device_7d",
+   "kind": "device",
+   "value": "ids-sensor-06",
+   "from": "2026-10-24T00:00:00Z",
+   "to": "2026-10-31T00:00:00Z",
+   "expected_items": 1392,
+   "postgresql": {
+    "pages": 14,
+    "items": 1392,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 0.139
+   },
+   "cassandra": {
+    "pages": 14,
+    "items": 1392,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 1.117
+   },
+   "compared_prefix_only": false,
+   "equal": true
+  },
+  {
+   "name": "q1_cold_device_7d",
+   "kind": "device",
+   "value": "ws-hr-0050",
+   "from": "2026-10-12T00:00:00Z",
+   "to": "2026-10-19T00:00:00Z",
+   "expected_items": 7,
+   "postgresql": {
+    "pages": 1,
+    "items": 7,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 0.004
+   },
+   "cassandra": {
+    "pages": 1,
+    "items": 7,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 0.012
+   },
+   "compared_prefix_only": false,
+   "equal": true
+  },
+  {
+   "name": "q2_hot_ipv6_7d",
+   "kind": "ip",
+   "value": "2001:db8:bad:4::6",
+   "from": "2026-10-24T00:00:00Z",
+   "to": "2026-10-31T00:00:00Z",
+   "expected_items": 1183,
+   "postgresql": {
+    "pages": 12,
+    "items": 1183,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 0.115
+   },
+   "cassandra": {
+    "pages": 12,
+    "items": 1183,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 0.891
+   },
+   "compared_prefix_only": false,
+   "equal": true
+  },
+  {
+   "name": "q2_ipv4_1d",
+   "kind": "ip",
+   "value": "203.0.113.173",
+   "from": "2026-10-08T00:00:00Z",
+   "to": "2026-10-09T00:00:00Z",
+   "expected_items": 871,
+   "postgresql": {
+    "pages": 9,
+    "items": 871,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 0.094
+   },
+   "cassandra": {
+    "pages": 9,
+    "items": 871,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 0.636
+   },
+   "compared_prefix_only": false,
+   "equal": true
+  },
+  {
+   "name": "q3_hot_severity_2d",
+   "kind": "alerts",
+   "value": 3,
+   "from": "2026-10-13T00:00:00Z",
+   "to": "2026-10-15T00:00:00Z",
+   "expected_items": 262,
+   "postgresql": {
+    "pages": 3,
+    "items": 262,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 0.028
+   },
+   "cassandra": {
+    "pages": 3,
+    "items": 262,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 0.214
+   },
+   "compared_prefix_only": false,
+   "equal": true
+  },
+  {
+   "name": "q3_severity5_7d",
+   "kind": "alerts",
+   "value": 5,
+   "from": "2026-10-17T00:00:00Z",
+   "to": "2026-10-24T00:00:00Z",
+   "expected_items": 165,
+   "postgresql": {
+    "pages": 2,
+    "items": 165,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 0.015
+   },
+   "cassandra": {
+    "pages": 2,
+    "items": 165,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 0.136
+   },
+   "compared_prefix_only": false,
+   "equal": true
+  }
+ ],
+ "api_sample_size": 500,
+ "cassandra_storage": {
+  "tablestats": {
+   "cyberguard.events_by_id": {
+    "SSTable count": "3",
+    "Space used (live)": "25900695",
+    "Space used (total)": "25900695",
+    "SSTable Compression Ratio": "0.36389",
+    "Number of partitions (estimate)": "99479",
+    "Memtable data size": "0",
+    "Local read count": "440025",
+    "Local write count": "200576",
+    "Bloom filter space used": "125240",
+    "Index summary off heap memory used": "21952",
+    "Compacted partition minimum bytes": "43",
+    "Compacted partition maximum bytes": "770",
+    "Compacted partition mean bytes": "704"
+   },
+   "cyberguard.events_by_device_day": {
+    "SSTable count": "2",
+    "Space used (live)": "3286406",
+    "Space used (total)": "3286406",
+    "SSTable Compression Ratio": "0.85300",
+    "Number of partitions (estimate)": "6708",
+    "Memtable data size": "0",
+    "Local read count": "361",
+    "Local write count": "100296",
+    "Bloom filter space used": "11192",
+    "Index summary off heap memory used": "2317",
+    "Compacted partition minimum bytes": "61",
+    "Compacted partition maximum bytes": "42510",
+    "Compacted partition mean bytes": "433"
+   },
+   "cyberguard.events_by_ip_day": {
+    "SSTable count": "2",
+    "Space used (live)": "4829556",
+    "Space used (total)": "4829556",
+    "SSTable Compression Ratio": "0.71594",
+    "Number of partitions (estimate)": "46852",
+    "Memtable data size": "0",
+    "Local read count": "336",
+    "Local write count": "100292",
+    "Bloom filter space used": "63424",
+    "Index summary off heap memory used": "11846",
+    "Compacted partition minimum bytes": "51",
+    "Compacted partition maximum bytes": "35425",
+    "Compacted partition mean bytes": "110"
+   },
+   "cyberguard.alerts_by_severity_day": {
+    "SSTable count": "2",
+    "Space used (live)": "260042",
+    "Space used (total)": "260042",
+    "SSTable Compression Ratio": "0.88614",
+    "Number of partitions (estimate)": "152",
+    "Memtable data size": "0",
+    "Local read count": "228",
+    "Local write count": "8348",
+    "Bloom filter space used": "392",
+    "Index summary off heap memory used": "96",
+    "Compacted partition minimum bytes": "51",
+    "Compacted partition maximum bytes": "4768",
+    "Compacted partition mean bytes": "1041"
+   },
+   "system.paxos": {
+    "SSTable count": "1",
+    "Space used (live)": "8368347",
+    "Space used (total)": "8368347",
+    "SSTable Compression Ratio": "0.36978",
+    "Number of partitions (estimate)": "99618",
+    "Memtable data size": "5765830",
+    "Local read count": "100152",
+    "Local write count": "623174",
+    "Bloom filter space used": "99424",
+    "Index summary off heap memory used": "17528",
+    "Compacted partition minimum bytes": "180",
+    "Compacted partition maximum bytes": "924",
+    "Compacted partition mean bytes": "228"
+   },
+   "system.batches": {
+    "SSTable count": "0",
+    "Space used (live)": "0",
+    "Space used (total)": "0",
+    "SSTable Compression Ratio": "-1.00000",
+    "Number of partitions (estimate)": "8883",
+    "Memtable data size": "2653872",
+    "Local read count": "0",
+    "Local write count": "200584",
+    "Bloom filter space used": "0",
+    "Index summary off heap memory used": "0",
+    "Compacted partition minimum bytes": "0",
+    "Compacted partition maximum bytes": "0",
+    "Compacted partition mean bytes": "0"
+   }
+  },
+  "tablehistograms": {
+   "events_by_device_day": [
+    "Percentile Read Latency Write Latency SSTables Partition Size Cell Count",
+    "50% 124.00 35.00 1.00 103 1",
+    "95% 258.00 72.00 1.00 1597 1",
+    "99% 446.00 149.00 1.00 6866 1",
+    "Max 446.00 2299.00 1.00 42510 1"
+   ],
+   "events_by_ip_day": [
+    "Percentile Read Latency Write Latency SSTables Partition Size Cell Count",
+    "50% 72.00 29.00 0.00 72 1",
+    "95% 310.00 72.00 1.00 215 1",
+    "99% 372.00 149.00 1.00 535 1",
+    "Max 372.00 1916.00 1.00 35425 1"
+   ],
+   "alerts_by_severity_day": [
+    "Percentile Read Latency Write Latency SSTables Partition Size Cell Count",
+    "50% 124.00 24.00 1.00 535 1",
+    "95% 372.00 60.00 1.00 3311 1",
+    "99% 372.00 149.00 1.00 3973 1",
+    "Max 372.00 372.00 1.00 4768 1"
+   ]
+  },
+  "du_bytes": {
+   "/var/lib/cassandra/data/cyberguard": 34276699,
+   "/var/lib/cassandra/data/system": 11320042,
+   "/var/lib/cassandra/commitlog": 268435456
+  },
+  "flushed_before_measure": true
+ },
+ "postgresql_storage": {
+  "tables": [
+   {
+    "relname": "devices",
+    "heap_bytes": 49152,
+    "index_bytes": 40960,
+    "total_bytes": 122880,
+    "n_live_tup": 405,
+    "n_dead_tup": 0,
+    "last_autovacuum": null,
+    "last_autoanalyze": "2026-11-09T14:37:34.377699+00:00"
+   },
+   {
+    "relname": "event_registry",
+    "heap_bytes": 5251072,
+    "index_bytes": 4481024,
+    "total_bytes": 9764864,
+    "n_live_tup": 100148,
+    "n_dead_tup": 0,
+    "last_autovacuum": "2026-11-09T14:44:34.387736+00:00",
+    "last_autoanalyze": "2026-11-09T14:45:34.499636+00:00"
+   },
+   {
+    "relname": "events",
+    "heap_bytes": 46145536,
+    "index_bytes": 19775488,
+    "total_bytes": 65970176,
+    "n_live_tup": 100024,
+    "n_dead_tup": 52,
+    "last_autovacuum": "2026-11-09T14:44:34.5022+00:00",
+    "last_autoanalyze": "2026-11-09T14:45:35.650496+00:00"
+   }
+  ],
+  "index_bytes": {
+   "devices_pkey": 40960,
+   "event_registry_pkey": 4481024,
+   "events_pkey": 4472832,
+   "events_device_time_idx": 7446528,
+   "events_ip_time_idx": 7307264,
+   "events_alert_severity_time_idx": 548864
+  },
+  "database_bytes": 83719859
+ },
+ "kind": "bulk_validation",
+ "dataset": "cyberguard-bulk-v1",
+ "seed": 20261109,
+ "target_events": 100000,
+ "finished_at_utc": "2026-11-09T14:48:14.534Z",
+ "wall_seconds": 37.6,
+ "expected": {
+  "content": {
+   "rows": 100000,
+   "digest": "041fad7bb65d9fd10c843fa1af3a0b4b"
+  },
+  "device": {
+   "rows": 100000,
+   "digest": "427dceea1087600c2645da66e3b16639"
+  },
+  "ip": {
+   "rows": 100000,
+   "digest": "a9850c3e3e0ba494b21a06e16164125e"
+  },
+  "alert": {
+   "rows": 8237,
+   "digest": "ab82fd4cb6614680b892317ad6a6400b"
+  }
+ },
+ "checks": [
+  {
+   "check": "postgresql: logical events == target",
+   "pass": true,
+   "detail": 100000
+  },
+  {
+   "check": "postgresql: IDs and full content equal generator",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "postgresql: no duplicated logical event (seq)",
+   "pass": true,
+   "detail": {
+    "dup": 0,
+    "beyond": 0
+   }
+  },
+  {
+   "check": "postgresql: all revisions == 1",
+   "pass": true,
+   "detail": 0
+  },
+  {
+   "check": "postgresql: no active reservation without event",
+   "pass": true,
+   "detail": 0
+  },
+  {
+   "check": "cassandra: events_by_device_day keys equal generator",
+   "pass": true,
+   "detail": {
+    "rows": 100000,
+    "expected": 100000
+   }
+  },
+  {
+   "check": "cassandra: events_by_ip_day keys equal generator",
+   "pass": true,
+   "detail": {
+    "rows": 100000,
+    "expected": 100000
+   }
+  },
+  {
+   "check": "cassandra: alerts_by_severity_day keys equal generator",
+   "pass": true,
+   "detail": {
+    "rows": 8237,
+    "expected": 8237
+   }
+  },
+  {
+   "check": "cassandra: logical (active) events == target",
+   "pass": true,
+   "detail": 100000
+  },
+  {
+   "check": "cassandra: IDs and full canonical content equal generator",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "cassandra: no duplicated logical event (seq)",
+   "pass": true,
+   "detail": {
+    "dup": 0,
+    "beyond": 0
+   }
+  },
+  {
+   "check": "cassandra: revisions == 1 and payload ID == key",
+   "pass": true,
+   "detail": 0
+  },
+  {
+   "check": "cassandra: no pending/deleting records",
+   "pass": true,
+   "detail": {}
+  },
+  {
+   "check": "cassandra: live physical rows == 3N + A",
+   "pass": true,
+   "detail": {
+    "live": 308237,
+    "expected": 308237
+   }
+  },
+  {
+   "check": "cassandra: measured partition distribution == manifest",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "api: deterministic sample of 500 READs equal in both databases",
+   "pass": true,
+   "detail": {
+    "postgresql": 0,
+    "cassandra": 0
+   }
+  },
+  {
+   "check": "api: q1_hot_device_7d (1392/1392 items) equal and expected",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "api: q1_cold_device_7d (7/7 items) equal and expected",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "api: q2_hot_ipv6_7d (1183/1183 items) equal and expected",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "api: q2_ipv4_1d (871/871 items) equal and expected",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "api: q3_hot_severity_2d (262/262 items) equal and expected",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "api: q3_severity5_7d (165/165 items) equal and expected",
+   "pass": true,
+   "detail": null
+  }
+ ],
+ "passed": true,
+ "note": "Functional validation; durations are observations, not benchmarks."
+}

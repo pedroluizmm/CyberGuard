@@ -1,0 +1,14 @@
+{
+ "kind": "generation_manifest",
+ "dataset": "cyberguard-bulk-v1",
+ "seed": 20261109,
+ "logical_events": 1000000,
+ "status": "wrote new manifest",
+ "manifest_sha256": "314a0e2bd728c2c4a776a4818e000a3b78bcef0008df77c4d7b42d5b107f56b0",
+ "generation_seconds": 32.9,
+ "events_per_second": 30395.5,
+ "finished_at_utc": "20261109T143445Z",
+ "python": "3.13.6",
+ "platform": "Windows-11-10.0.26200-SP0",
+ "note": "Generation time only (CPU, no I/O to databases); not a database measurement."
+}

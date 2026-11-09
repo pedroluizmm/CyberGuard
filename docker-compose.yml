@@ -1,0 +1,60 @@
+name: cyberguard
+
+services:
+  cassandra:
+    image: cassandra:5.0.9
+    mem_limit: 5g
+    environment:
+      CASSANDRA_CLUSTER_NAME: CyberGuardLocal
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_RACK: rack1
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+      MAX_HEAP_SIZE: 2G
+      # G1 is the image default. Do not set HEAP_NEWSIZE with G1.
+    ports:
+      - "127.0.0.1:9042:9042"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    networks:
+      - storage
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh 127.0.0.1 9042 -e 'SELECT cluster_name FROM system.local;' > /dev/null 2>&1"]
+      interval: 30s
+      timeout: 15s
+      start_period: 180s
+      retries: 15
+    stop_grace_period: 60s
+
+  postgresql:
+    image: postgres:17.11-bookworm
+    mem_limit: 2g
+    shm_size: 512m
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Generate .env first}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Generate .env first}
+      POSTGRES_DB: ${POSTGRES_DB:?Generate .env first}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    command: ["postgres", "-c", "shared_buffers=512MB", "-c", "password_encryption=scram-sha-256"]
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+    networks:
+      - storage
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -h 127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 10
+    stop_grace_period: 30s
+
+networks:
+  storage:
+    driver: bridge
+    # Dedicated bridge isolates this project's services. Host ingress is loopback-only.
+    # Docker Engine 29 does not publish ports from a solely internal network.
+
+volumes:
+  cassandra_data:
+  postgresql_data:

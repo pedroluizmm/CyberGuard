@@ -1,0 +1,506 @@
+[
+  {
+    "event_id": "70e06830-f848-4214-a3c5-09eee277bdc1",
+    "occurred_at": "2026-11-06T00:00:00.000Z",
+    "event_date": "2026-11-06",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.10",
+    "category": "authentication",
+    "event_type": "login",
+    "severity": 1,
+    "outcome": "success",
+    "message": "Synthetic login event 00; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 0,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "066aba9d-73c5-419c-957b-bf566666ccea",
+    "occurred_at": "2026-11-06T01:00:00.000Z",
+    "event_date": "2026-11-06",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.11",
+    "category": "authentication",
+    "event_type": "login",
+    "severity": 2,
+    "outcome": "failure",
+    "message": "Synthetic login event 01; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 1,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "091ce64b-d96b-4400-9049-7e886ff8eea8",
+    "occurred_at": "2026-11-06T02:00:00.123Z",
+    "event_date": "2026-11-06",
+    "device_id": "soc-sensor-02",
+    "source_ip": "2001:db8::10",
+    "category": "authentication",
+    "event_type": "suspicious_access",
+    "severity": 3,
+    "outcome": "unknown",
+    "message": "Synthetic suspicious_access event 02; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 2,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "8830d5c3-ea5b-4292-ab1a-c2476bdd8d2f",
+    "occurred_at": "2026-11-06T03:00:00.000Z",
+    "event_date": "2026-11-06",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.10",
+    "category": "network",
+    "event_type": "connection",
+    "severity": 4,
+    "outcome": "blocked",
+    "message": "Synthetic connection event 03; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 3,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "fd64e0f4-6bc5-4fa2-bf16-77cedb4e6e0f",
+    "occurred_at": "2026-11-06T04:00:00.000Z",
+    "event_date": "2026-11-06",
+    "device_id": "soc-sensor-02",
+    "source_ip": "2001:db8::10",
+    "category": "network",
+    "event_type": "traffic_anomaly",
+    "severity": 5,
+    "outcome": "unknown",
+    "message": "Synthetic traffic_anomaly event 04; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 4,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "ae25f048-3437-4abf-8a9f-98e08756ae23",
+    "occurred_at": "2026-11-06T12:00:00.000Z",
+    "event_date": "2026-11-06",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.10",
+    "category": "alert",
+    "event_type": "potential_threat",
+    "severity": 4,
+    "outcome": "unknown",
+    "message": "Synthetic potential_threat event 05; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 5,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "b490de4e-48f8-4ea8-833c-9518846df156",
+    "occurred_at": "2026-11-06T12:00:00.000Z",
+    "event_date": "2026-11-06",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.10",
+    "category": "alert",
+    "event_type": "potential_threat",
+    "severity": 4,
+    "outcome": "unknown",
+    "message": "Synthetic potential_threat event 06; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 6,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "899cda3d-0241-42e3-81a3-164eb037bc7e",
+    "occurred_at": "2026-11-06T23:59:59.999Z",
+    "event_date": "2026-11-06",
+    "device_id": "soc-sensor-02",
+    "source_ip": "2001:db8::10",
+    "category": "alert",
+    "event_type": "potential_threat",
+    "severity": 5,
+    "outcome": "unknown",
+    "message": "Synthetic potential_threat event 07; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 7,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "12a91ce8-539f-450f-8cc0-8a73dc9c05d0",
+    "occurred_at": "2026-11-07T00:00:00.000Z",
+    "event_date": "2026-11-07",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.10",
+    "category": "authentication",
+    "event_type": "login",
+    "severity": 1,
+    "outcome": "success",
+    "message": "Synthetic login event 08; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 8,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "14160ed6-4f42-4c09-8f5f-20fc36bbf7df",
+    "occurred_at": "2026-11-07T01:00:00.000Z",
+    "event_date": "2026-11-07",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.11",
+    "category": "authentication",
+    "event_type": "login",
+    "severity": 2,
+    "outcome": "failure",
+    "message": "Synthetic login event 09; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 9,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "e9103840-7e76-477a-b342-27c2379d707b",
+    "occurred_at": "2026-11-07T02:00:00.123Z",
+    "event_date": "2026-11-07",
+    "device_id": "soc-sensor-02",
+    "source_ip": "2001:db8::10",
+    "category": "authentication",
+    "event_type": "suspicious_access",
+    "severity": 3,
+    "outcome": "unknown",
+    "message": "Synthetic suspicious_access event 10; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 10,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "ccea4317-887e-4147-aa2b-c474cdb6b515",
+    "occurred_at": "2026-11-07T03:00:00.000Z",
+    "event_date": "2026-11-07",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.10",
+    "category": "network",
+    "event_type": "connection",
+    "severity": 4,
+    "outcome": "blocked",
+    "message": "Synthetic connection event 11; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 11,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "a9f0bc3b-1c2d-453b-bf22-feb745a230bb",
+    "occurred_at": "2026-11-07T04:00:00.000Z",
+    "event_date": "2026-11-07",
+    "device_id": "soc-sensor-02",
+    "source_ip": "2001:db8::10",
+    "category": "network",
+    "event_type": "traffic_anomaly",
+    "severity": 5,
+    "outcome": "unknown",
+    "message": "Synthetic traffic_anomaly event 12; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 12,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "787d595d-b689-411c-a4ab-0bbc00fed4af",
+    "occurred_at": "2026-11-07T12:00:00.000Z",
+    "event_date": "2026-11-07",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.10",
+    "category": "alert",
+    "event_type": "potential_threat",
+    "severity": 4,
+    "outcome": "unknown",
+    "message": "Synthetic potential_threat event 13; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 13,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "4cd929d7-4233-4763-9914-46847bee8197",
+    "occurred_at": "2026-11-07T12:00:00.000Z",
+    "event_date": "2026-11-07",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.10",
+    "category": "alert",
+    "event_type": "potential_threat",
+    "severity": 4,
+    "outcome": "unknown",
+    "message": "Synthetic potential_threat event 14; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 14,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "5fe83362-e916-43e7-9996-5e3182bd8d22",
+    "occurred_at": "2026-11-07T23:59:59.999Z",
+    "event_date": "2026-11-07",
+    "device_id": "soc-sensor-02",
+    "source_ip": "2001:db8::10",
+    "category": "alert",
+    "event_type": "potential_threat",
+    "severity": 5,
+    "outcome": "unknown",
+    "message": "Synthetic potential_threat event 15; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 15,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "ff634dd1-4759-47fa-b530-a1513dbf4a07",
+    "occurred_at": "2026-11-08T00:00:00.000Z",
+    "event_date": "2026-11-08",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.10",
+    "category": "authentication",
+    "event_type": "login",
+    "severity": 1,
+    "outcome": "success",
+    "message": "Synthetic login event 16; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 16,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "e306ec8e-9ca3-4d18-8e04-d383ddae7bdb",
+    "occurred_at": "2026-11-08T01:00:00.000Z",
+    "event_date": "2026-11-08",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.11",
+    "category": "authentication",
+    "event_type": "login",
+    "severity": 2,
+    "outcome": "failure",
+    "message": "Synthetic login event 17; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 17,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "e37ead42-fdad-4d2a-80ee-efb0eb26e733",
+    "occurred_at": "2026-11-08T02:00:00.123Z",
+    "event_date": "2026-11-08",
+    "device_id": "soc-sensor-02",
+    "source_ip": "2001:db8::10",
+    "category": "authentication",
+    "event_type": "suspicious_access",
+    "severity": 3,
+    "outcome": "unknown",
+    "message": "Synthetic suspicious_access event 18; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 18,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "5dd3a2a5-9f65-40c4-b585-303a9d19869e",
+    "occurred_at": "2026-11-08T03:00:00.000Z",
+    "event_date": "2026-11-08",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.10",
+    "category": "network",
+    "event_type": "connection",
+    "severity": 4,
+    "outcome": "blocked",
+    "message": "Synthetic connection event 19; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 19,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "2b55887e-c5be-49e3-9df9-db7e32766264",
+    "occurred_at": "2026-11-08T04:00:00.000Z",
+    "event_date": "2026-11-08",
+    "device_id": "soc-sensor-02",
+    "source_ip": "2001:db8::10",
+    "category": "network",
+    "event_type": "traffic_anomaly",
+    "severity": 5,
+    "outcome": "unknown",
+    "message": "Synthetic traffic_anomaly event 20; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 20,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "861b9e71-cb2d-4827-ad99-053cd30620c4",
+    "occurred_at": "2026-11-08T12:00:00.000Z",
+    "event_date": "2026-11-08",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.10",
+    "category": "alert",
+    "event_type": "potential_threat",
+    "severity": 4,
+    "outcome": "unknown",
+    "message": "Synthetic potential_threat event 21; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 21,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "fc9af62f-8eef-47a2-abc5-68b7f20c696d",
+    "occurred_at": "2026-11-08T12:00:00.000Z",
+    "event_date": "2026-11-08",
+    "device_id": "soc-sensor-01",
+    "source_ip": "192.0.2.10",
+    "category": "alert",
+    "event_type": "potential_threat",
+    "severity": 4,
+    "outcome": "unknown",
+    "message": "Synthetic potential_threat event 22; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 22,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  },
+  {
+    "event_id": "3048fa16-e99a-4a41-b239-05af31542c28",
+    "occurred_at": "2026-11-08T23:59:59.999Z",
+    "event_date": "2026-11-08",
+    "device_id": "soc-sensor-02",
+    "source_ip": "2001:db8::10",
+    "category": "alert",
+    "event_type": "potential_threat",
+    "severity": 5,
+    "outcome": "unknown",
+    "message": "Synthetic potential_threat event 23; no real security activity.",
+    "metadata": {
+      "dataset": "cyberguard-task02-sample-v1",
+      "synthetic": true,
+      "sequence": 23,
+      "tags": [
+        "academic",
+        "validation"
+      ]
+    }
+  }
+]
