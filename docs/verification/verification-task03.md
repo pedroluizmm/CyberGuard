@@ -1,6 +1,6 @@
 # Task 03 - Massa volumosa: verificação
 
-Data: 09/11/2026 (UTC nos relatórios). Fluxo READ → PLAN → APPLY → VERIFY. Nenhum commit ou push. Metodologia em [bulk-load.md](bulk-load.md); relatórios JSON brutos em `data/bulk/reports/`.
+Data: 09/11/2026 (UTC nos relatórios). Fluxo READ → PLAN → APPLY → VERIFY. Nenhum commit ou push. Metodologia em [bulk-load.md](../bulk-load.md); relatórios JSON brutos em `data/bulk/reports/`.
 
 ## Ambiente medido
 
@@ -50,7 +50,7 @@ Backend, esquemas SQL/CQL, Compose, frontend e configurações dos bancos **não
 | 100 mil | 100 000 (+56 000 após interrupção: 55 591 criados, 409 reutilizados) | 100 000 ativos; 308 237 linhas vivas (+54 000: 53 305 criados, 695 reutilizados) | 22/22 checks após morte forçada do carregador e retomada nos dois bancos; 0 pendentes | PG 62,8 s* até o kill + 103,5 s na retomada; Cassandra 52,0 s* + 75,5 s |
 | 1 milhão | **1 000 000** (+900 000 criados, 0 retries); `events` = 1 000 024 | **1 000 000** ativos; **3 082 443** linhas vivas = 3N+A | **22/22 checks**: conteúdo integral, IDs, projeções, partições, 500 READs, Q1–Q3; 0 pendentes/duplicados | PG 1 716,6 s (524 ev/s); Cassandra 1 516,4 s (594 ev/s) |
 
-\* Execução morta à força: o tempo vem do log por chunk (do primeiro ao último chunk confirmado) e exclui o início e a cauda em voo. Tempo acumulado até 1 M, somando todas as execuções: PG ≈ 1 900 s (31,7 min); Cassandra ≈ 1 661 s (27,7 min). São tempos de **carga inicial via API**, não benchmark (ver [bulk-load.md](bulk-load.md)).
+\* Execução morta à força: o tempo vem do log por chunk (do primeiro ao último chunk confirmado) e exclui o início e a cauda em voo. Tempo acumulado até 1 M, somando todas as execuções: PG ≈ 1 900 s (31,7 min); Cassandra ≈ 1 661 s (27,7 min). São tempos de **carga inicial via API**, não benchmark (ver [bulk-load.md](../bulk-load.md)).
 
 ### Comandos executados
 

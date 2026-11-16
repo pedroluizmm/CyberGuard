@@ -18,10 +18,8 @@ import argparse
 import csv
 from datetime import date, timedelta
 import hashlib
-import io
 import json
 from pathlib import Path
-import subprocess
 import sys
 import time
 from urllib.parse import urlencode
@@ -31,7 +29,8 @@ sys.path.insert(0, str(HERE.parent / "loading"))
 sys.path.insert(0, str(HERE.parent / "generation"))
 csv.field_size_limit(1 << 24)
 import bulk_events as bulk  # noqa: E402
-from bulk_runtime import REPORT_DIR, ROOT, Api, atomic_write_json, compose_exec, psql, run_text, stamp, utc_now  # noqa: E402
+from bulk_runtime import (REPORT_DIR, ROOT, Api, atomic_write_json, compose_exec, cql_copy, psql, run_text,  # noqa: E402
+                          stamp, stream_csv, utc_now)
 
 MANIFEST = ROOT / "data/bulk" / f"{bulk.DATASET}.manifest.json"
 DATES = set(bulk.DATES)
@@ -66,15 +65,6 @@ def ts_key(occurred_at: str) -> str:
 
 def content_key(data: dict) -> str:
     return bulk.canonical_line(data).decode()
-
-
-def stream_csv(command, **fmt):
-    proc = subprocess.Popen(command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    reader = csv.reader(io.TextIOWrapper(proc.stdout, encoding="utf-8", newline=""), **fmt)
-    yield from reader
-    stderr = proc.stderr.read()
-    if proc.wait() != 0 or any(t in stderr for t in (b"Exception", b"Error", b"Failed")):
-        raise RuntimeError(f"export failed ({command[-1][:60]}...)")
 
 
 def distribution(counts: dict) -> dict:
@@ -197,10 +187,7 @@ class Validation:
 
     # ---------- Cassandra ----------
     def cql_copy(self, table: str, columns: str):
-        command = compose_exec(self.args.docker_config, "cassandra", "cqlsh", "127.0.0.1", "9042",
-                               "--request-timeout=120", "-e",
-                               f"COPY cyberguard.{table} ({columns}) TO STDOUT WITH HEADER=false AND PAGETIMEOUT=60")
-        return stream_csv(command, escapechar="\\", doublequote=False)
+        return cql_copy(self.args.docker_config, table, columns)
 
     def cassandra(self):
         t = time.perf_counter()

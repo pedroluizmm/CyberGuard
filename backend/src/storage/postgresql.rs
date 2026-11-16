@@ -1,5 +1,5 @@
 use crate::{
-    analytics::{EventQuery, QueryKey},
+    analytics::{Cell, EventQuery, OverviewQuery, QueryKey},
     domain::{Event, EventData, UpdateEvent},
     error::{Error, Result},
 };
@@ -157,6 +157,44 @@ impl PostgresStore {
                 .map_err(|_| Error::Unavailable)?
                 .ok_or(Error::NotFound)?;
         Ok(if deleted { "deleted" } else { "active" })
+    }
+
+    /// Aggregates on read from the normalized `events` table. The covering index
+    /// `events_time_cover_idx (occurred_at) INCLUDE (category, severity)` allows an
+    /// index-only range scan; filters are fixed SQL fragments with bound values.
+    pub async fn overview(&self, q: &OverviewQuery) -> Result<Vec<Cell>> {
+        let filter = match (&q.category, q.severity) {
+            (None, None) => "",
+            (Some(_), None) => " AND category=$3",
+            (None, Some(_)) => " AND severity=$3",
+            (Some(_), Some(_)) => " AND category=$3 AND severity=$4",
+        };
+        let sql = format!(
+            // date_bin is timezone independent (UTC-aligned origin) and was the
+            // cheapest equivalent bucketing expression measured (vs date_trunc).
+            "SELECT date_bin('1 hour', occurred_at, TIMESTAMPTZ '2000-01-01 00:00:00+00') AS hour, category, severity, count(*) AS n FROM events WHERE occurred_at >= $1 AND occurred_at < $2{filter} GROUP BY 1, 2, 3"
+        );
+        let mut statement = sqlx::query(&sql).bind(q.from).bind(q.to);
+        if let Some(category) = &q.category {
+            statement = statement.bind(category);
+        }
+        if let Some(severity) = q.severity {
+            statement = statement.bind(severity);
+        }
+        statement
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .into_iter()
+            .map(|row| {
+                Ok(Cell {
+                    hour: row.try_get("hour").map_err(|_| Error::Corrupt)?,
+                    category: row.try_get("category").map_err(|_| Error::Corrupt)?,
+                    severity: row.try_get("severity").map_err(|_| Error::Corrupt)?,
+                    count: row.try_get("n").map_err(|_| Error::Corrupt)?,
+                })
+            })
+            .collect()
     }
 
     pub async fn query(&self, q: &EventQuery) -> Result<Vec<Event>> {

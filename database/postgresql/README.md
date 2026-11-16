@@ -1,5 +1,8 @@
 # PostgreSQL
 
-`001_events.sql` cria devices, event_registry e events, com PKs/FKs/CHECKs e índices adequados a Q1/Q2/Q3. A tabela events é tipada; o registro de UUIDs evita reutilização após DELETE. Transações mantêm registro/evento consistentes. Justificativas em `docs/data-model.md` e consultas em `docs/query-patterns.md`.
+- `001_events.sql` cria `devices`, `event_registry` e `events`, com PKs, FKs, CHECKs e os índices de Q1/Q2/Q3. A tabela `events` é tipada, e o registro de UUIDs impede reutilizar um ID depois do DELETE.
+- `002_dashboard.sql` cria o índice de cobertura `events_time_cover_idx (occurred_at) INCLUDE (category, severity)` para o painel agregado (*index-only scan*) e executa `ANALYZE`.
 
-Aplicar da raiz: `python scripts/apply_schema.py`. Isso funciona nos volumes existentes; não depende dos scripts de inicialização da imagem (executados só no primeiro boot de um volume novo). Reaplicar é aditivo; futuras alterações exigem migração explícita. O probe da Task 01 continua usando `SELECT 1`.
+As justificativas estão em `docs/data-model.md`, as consultas em `docs/query-patterns.md` e o uso nos experimentos em `docs/benchmark-methodology.md`.
+
+Aplique da raiz com `python scripts/apply_schema.py`, que roda todos os arquivos `NNN_*.sql` em ordem e funciona sobre os volumes existentes. Reaplicar é aditivo. Nenhum índice existente foi removido ou alterado para os experimentos.

@@ -31,8 +31,11 @@ data/generated/*
 *.log
 *.tmp
 *.temp
+# Atomic JSON writes (scripts/loading/bulk_runtime.py) before rename.
+*.partial
 .cache/
 tmp/
 .playwright-mcp/
 .DS_Store
 Thumbs.db
+.vscode

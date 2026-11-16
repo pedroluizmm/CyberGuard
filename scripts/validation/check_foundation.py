@@ -33,9 +33,11 @@ def main() -> None:
         tracked = git("ls-files", "--", name)
         check(tracked.returncode == 0 and not tracked.stdout.strip(), f"PDF untracked: {name}")
 
-    for path in [".env", ".env.local", "credentials.local.json", "private.key", "data/generated/check.csv", "frontend/node_modules/check", "frontend/dist/check", "backend/target/check", ".venv/check", "scripts/__pycache__/check.pyc", ".pytest_cache/check", "tmp/check.log", ".playwright-mcp/check.yaml"]:
+    for path in [".env", ".env.local", "credentials.local.json", "private.key", "data/generated/check.csv", "frontend/node_modules/check", "frontend/dist/check", "backend/target/check", ".venv/check", "scripts/__pycache__/check.pyc", ".pytest_cache/check", "tmp/check.log", ".playwright-mcp/check.yaml", "benchmarks/results/run/run.json.partial"]:
         check(git("check-ignore", "--quiet", "--", path).returncode == 0, f"Ignored: {path}")
-    for path in [".env.example", "data/samples/check.csv", "database/cassandra/schema.cql", "database/postgresql/schema.sql", "benchmarks/check.json", "data/generated/README.md", "data/bulk/check.manifest.json", "data/bulk/reports/check.json", "backend/Cargo.lock", "frontend/package-lock.json"]:
+    for path in [".env.example", "data/samples/check.csv", "database/cassandra/schema.cql", "database/postgresql/schema.sql", "benchmarks/check.json", "data/generated/README.md", "data/bulk/check.manifest.json", "data/bulk/reports/check.json", "backend/Cargo.lock", "frontend/package-lock.json",
+                 "benchmarks/results/run/raw.csv", "benchmarks/results/run/environment.json",
+                 "benchmarks/results/summary.json", "benchmarks/sql/control.sql", "docs/apresentacao/slides.html"]:
         check(git("check-ignore", "--quiet", "--", path).returncode == 1, f"Versionable: {path}")
 
     check((ROOT / ".env").is_file(), "Local .env exists")

@@ -1,0 +1,220 @@
+{
+ "run_id": "20261115T202202Z-durability",
+ "suite": "durability",
+ "started_at": "2026-11-15T20:22:12.491Z",
+ "complete": true,
+ "protocol": {
+  "warmup": 5,
+  "runs": 30,
+  "order": "pares intercalados, ordem alternada",
+  "cache": "quente (aquecimento descartado; 1\u00aa observa\u00e7\u00e3o registrada)",
+  "http_ms": "cliente Python, perf_counter, conex\u00e3o keep-alive",
+  "db_ms": "Server-Timing da API: adaptador de armazenamento (driver + rede + banco + decodifica\u00e7\u00e3o)",
+  "api_build": "release",
+  "cassandra_read_concurrency": 32,
+  "postgres_synchronous_commit": "off",
+  "postgres_pool_size": 16
+ },
+ "environment": {
+  "host": {
+   "os": "Windows-11-10.0.26200-SP0",
+   "processor": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel",
+   "logical_cpus": 22,
+   "physical_cpus": 16,
+   "ram_total_gib": 15.37,
+   "ram_available_gib": 1.75,
+   "python": "3.13.6",
+   "cpu_model": "Intel(R) Core(TM) Ultra 7 155H"
+  },
+  "docker": {
+   "server_version": "29.4.3",
+   "vm_cpus": 22,
+   "vm_memory_gib": 7.44,
+   "os": "Docker Desktop"
+  },
+  "dataset": {
+   "name": "cyberguard-bulk-v1",
+   "logical_events": 1000000,
+   "alerts": 82443,
+   "window": [
+    "2026-10-05",
+    "2026-11-01"
+   ]
+  }
+ },
+ "operations": [],
+ "writes": {
+  "window": [
+   "2002-01-07T00:00:00Z",
+   "2002-01-14T00:00:00Z"
+  ],
+  "runs": 10,
+  "warmup_runs": 2,
+  "events_per_run": 100,
+  "concurrency": 8,
+  "window_total_after_cleanup": {
+   "postgresql": 0,
+   "cassandra": 0
+  },
+  "ops": {
+   "create": {
+    "postgresql": {
+     "latency": {
+      "n": 1000,
+      "median": 5.829,
+      "p25": 5.106,
+      "p75": 7.037,
+      "p95": 10.361,
+      "min": 3.779,
+      "max": 20.269,
+      "mean": 6.385,
+      "stdev": 1.926
+     },
+     "throughput_ops_s": {
+      "n": 10,
+      "median": 1173.6,
+      "p25": 1135.775,
+      "p75": 1221.4,
+      "p95": 1246.745,
+      "min": 885.3,
+      "max": 1248.5,
+      "mean": 1146.21,
+      "stdev": 112.082
+     },
+     "errors": 0
+    },
+    "cassandra": {
+     "latency": {
+      "n": 1000,
+      "median": 9.466,
+      "p25": 8.742,
+      "p75": 10.627,
+      "p95": 13.505,
+      "min": 7.088,
+      "max": 30.789,
+      "mean": 9.977,
+      "stdev": 2.212
+     },
+     "throughput_ops_s": {
+      "n": 10,
+      "median": 750.45,
+      "p25": 726.125,
+      "p75": 772.175,
+      "p95": 786.265,
+      "min": 671.5,
+      "max": 794.5,
+      "mean": 744.23,
+      "stdev": 37.117
+     },
+     "errors": 0
+    }
+   },
+   "update": {
+    "postgresql": {
+     "latency": {
+      "n": 1000,
+      "median": 4.814,
+      "p25": 4.184,
+      "p75": 5.617,
+      "p95": 7.185,
+      "min": 2.948,
+      "max": 31.951,
+      "mean": 5.097,
+      "stdev": 1.647
+     },
+     "throughput_ops_s": {
+      "n": 10,
+      "median": 1424.65,
+      "p25": 1313.375,
+      "p75": 1452.7,
+      "p95": 1500.77,
+      "min": 1276.8,
+      "max": 1523.9,
+      "mean": 1397.35,
+      "stdev": 86.663
+     },
+     "errors": 0
+    },
+    "cassandra": {
+     "latency": {
+      "n": 1000,
+      "median": 5.135,
+      "p25": 4.497,
+      "p75": 6.079,
+      "p95": 9.662,
+      "min": 3.191,
+      "max": 30.386,
+      "mean": 5.765,
+      "stdev": 2.524
+     },
+     "throughput_ops_s": {
+      "n": 10,
+      "median": 1298.2,
+      "p25": 1211.25,
+      "p75": 1420.275,
+      "p95": 1466.805,
+      "min": 837.0,
+      "max": 1479.9,
+      "mean": 1273.24,
+      "stdev": 191.281
+     },
+     "errors": 0
+    }
+   },
+   "delete": {
+    "postgresql": {
+     "latency": {
+      "n": 1000,
+      "median": 3.474,
+      "p25": 3.209,
+      "p75": 3.881,
+      "p95": 5.57,
+      "min": 2.496,
+      "max": 30.369,
+      "mean": 3.779,
+      "stdev": 1.669
+     },
+     "throughput_ops_s": {
+      "n": 10,
+      "median": 1851.75,
+      "p25": 1804.625,
+      "p75": 1891.125,
+      "p95": 1936.36,
+      "min": 1768.2,
+      "max": 1958.5,
+      "mean": 1852.52,
+      "stdev": 61.123
+     },
+     "errors": 0
+    },
+    "cassandra": {
+     "latency": {
+      "n": 1000,
+      "median": 7.554,
+      "p25": 7.118,
+      "p75": 8.123,
+      "p95": 11.054,
+      "min": 5.85,
+      "max": 32.114,
+      "mean": 7.928,
+      "stdev": 1.724
+     },
+     "throughput_ops_s": {
+      "n": 10,
+      "median": 932.1,
+      "p25": 931.1,
+      "p75": 941.175,
+      "p95": 952.54,
+      "min": 844.1,
+      "max": 956.5,
+      "mean": 923.98,
+      "stdev": 33.545
+     },
+     "errors": 0
+    }
+   }
+  }
+ },
+ "seconds": 6.7,
+ "finished_at": "2026-11-15T20:22:19.214Z"
+}

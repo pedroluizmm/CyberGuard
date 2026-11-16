@@ -1,0 +1,22 @@
+{
+ "started_at": "2026-11-15T05:24:41.678Z",
+ "apply": true,
+ "cassandra_canonical_export_seconds": 17.6,
+ "cassandra_lifecycle_counts": {
+  "active": 1000024,
+  "deleted": 180
+ },
+ "postgresql_aggregate_seconds": 0.7,
+ "truth_cells": 9978,
+ "truth_events": 1000024,
+ "counter_cells_before": 9999,
+ "counter_events_before": 1000025,
+ "delta_cells": 1,
+ "delta_events": -1,
+ "postgresql_events": 1000024,
+ "postgresql_equal_to_cassandra_truth": true,
+ "apply_seconds": 0.6,
+ "counters_equal_truth_after": true,
+ "counter_events_after": 1000024,
+ "seconds": 20.5
+}

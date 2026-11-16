@@ -25,23 +25,23 @@ Cada entregável ausente implica penalidade de 1 ponto. Entregas progressivas t�
 
 ## Matriz de requisitos
 
-| ID | Requisito | Fonte | Situação após Task 02 |
+| ID | Requisito | Fonte | Situação final (Task 04) e evidência |
 | --- | --- | --- | --- |
-| R01 | Paradigma, aplicações adequadas, arquitetura, organização, consultas, escalabilidade, exemplos de mercado, fornecedor/download e licença | Instruções p. 1, §3 | Pesquisa aprofundada pendente |
-| R02 | Comparar modelos, relações, SQL/CQL, consistência/transações, índices, escalabilidade e cenários; vantagens e limitações | Instruções p. 1, §3 | Direção arquitetural definida; comparação pendente |
-| R03 | Diagramas/modelos dos dois bancos, justificativa das diferenças, CRUD equivalente | Instruções pp. 1-2, §4 | Implementados na Task 02; modelos em data-model.md e testes reais de CRUD/consultas |
-| R04 | Mesmo conjunto lógico, integridade e equivalência semântica, apesar de diferenças físicas | Instruções p. 2, §§4-5 | Comprovado na amostra de 24 eventos e em testes; validação volumosa pendente |
-| R05 | Instalação, geração/carga e execução automatizáveis | Instruções p. 2, §4 | Bootstrap, schemas e geração/carga idempotente da amostra; bulk pendente |
-| R06 | Mínimo de 1.000.000 registros lógicos; 5.000.000+ recomendados quando houver recursos | Instruções p. 2, §5 | Nenhuma massa definitiva gerada |
-| R07 | Documentar significado de registro, origem/geração, quantidade, tamanho, esquema e tempo de carga | Instruções p. 2, §5 | Contrato, origem sintética, contagens e hash da amostra documentados; tamanho/tempo de carga volumosa pendentes |
-| R08 | Pelo menos três consultas/operações comparáveis, incluindo cenário realista favorável ao NoSQL | Instruções p. 2, §6 | Não executado |
-| R09 | Cada operação ao menos dez vezes; tempos brutos e comparação preferencial de medianas | Instruções p. 2, §6 | Não executado |
-| R10 | Hardware, versões, índices, massa, filtros, método de medição e cache/aquecimento documentados | Instruções p. 2, §6 | Protocolo futuro obrigatório |
-| R11 | Métricas lado a lado, explicação técnica e reconhecimento de casos favoráveis ao relacional | Instruções p. 2, §6 | Sem métricas nesta etapa |
-| R12 | Dashboard consultando dados reais com pelo menos três indicadores/visualizações e dois filtros que executem novas consultas | Instruções p. 2, §7 | Apenas interface de fundação |
-| R13 | Alternância relacional/NoSQL com equivalência de negócio, tempos em ms e visualização comparativa | Instruções p. 2, §7 | Pendente |
-| R14 | Demonstrar ao vivo consulta do dashboard evidenciando ganho NoSQL identificado no experimento | Instruções pp. 2-3, §§7,10 | Pendente |
-| R15 | Slides, código, README, modelos, scripts de criação/carga, consultas e índices, resultados brutos/planilha e evidência da massa | Instruções p. 3, §8 | Apenas fundação e documentação inicial |
+| R01 | Paradigma, aplicações adequadas, arquitetura, organização, consultas, escalabilidade, exemplos de mercado, fornecedor/download e licença | Instruções p. 1, §3 | Atendido: [entregas/10-11-pesquisa-cassandra.md](entregas/10-11-pesquisa-cassandra.md) e slides |
+| R02 | Comparar modelos, relações, SQL/CQL, consistência/transações, índices, escalabilidade e cenários; vantagens e limitações | Instruções p. 1, §3 | Atendido: [entregas/17-11-vantagens-problema-modelagem.md](entregas/17-11-vantagens-problema-modelagem.md) |
+| R03 | Diagramas/modelos dos dois bancos, justificativa das diferenças, CRUD equivalente | Instruções pp. 1-2, §4 | Atendido: [data-model.md](data-model.md); CRUD testado em `test_integration.py` (10 testes) |
+| R04 | Mesmo conjunto lógico, integridade e equivalência semântica | Instruções p. 2, §§4-5 | Atendido: `check_bulk.py` 22/22 em 1 M; rollup × agregação PostgreSQL iguais célula a célula; benchmarks com resposta idêntica em 9/9 operações |
+| R05 | Instalação, geração/carga e execução automatizáveis | Instruções p. 2, §4 | Atendido: `setup_env.py`, Compose, `apply_schema.py`, `run_api.py`, `generate_bulk.py`, `load_bulk.py`, `reconcile_rollup.py` |
+| R06 | Mínimo de 1.000.000 registros lógicos; 5.000.000+ recomendados quando houver recursos | Instruções p. 2, §5 | 1 M atendido nos dois bancos. 5 M não tentado por limite de RAM do host (justificado em [verification-task03.md](verification/verification-task03.md)) |
+| R07 | Documentar significado de registro, origem/geração, quantidade, tamanho, esquema e tempo de carga | Instruções p. 2, §5 | Atendido: [bulk-load.md](bulk-load.md), [entregas/19-11-massa-carga-dados.md](entregas/19-11-massa-carga-dados.md), relatórios em `data/bulk/reports/` |
+| R08 | Pelo menos três consultas/operações comparáveis, incluindo cenário realista favorável ao NoSQL | Instruções p. 2, §6 | Atendido com ressalva: E1–E6; E4 (painel) com rollup Cassandra de 7,1× a 21,9× mais rápido que a agregação na leitura do PostgreSQL, ganho da pré-agregação na escrita ([benchmark-methodology.md](benchmark-methodology.md)) |
+| R09 | Cada operação ao menos dez vezes; tempos brutos e comparação de medianas | Instruções p. 2, §6 | Atendido: 30 medições + 5 aquecimentos por operação e banco; `raw.csv` por requisição |
+| R10 | Hardware, versões, índices, massa, filtros, método de medição e cache/aquecimento | Instruções p. 2, §6 | Atendido: `environment.json` por execução e seção de ambiente da metodologia |
+| R11 | Métricas lado a lado, explicação técnica, casos favoráveis ao relacional | Instruções p. 2, §6 | Atendido: E1–E3 e E6 com confirmação antes do fsync nos dois bancos favorecem o PostgreSQL; controle E5 (view materializada) documentado |
+| R12 | Dashboard com dados reais, três ou mais indicadores/visualizações e dois ou mais filtros que executem novas consultas | Instruções p. 2, §7 | Atendido: 4 indicadores, série horária, severidade e categorias; filtros de período, categoria e severidade e consultas Q1–Q3 |
+| R13 | Alternância relacional/NoSQL com equivalência, tempos em ms e visualização comparativa | Instruções p. 2, §7 | Atendido: seletor de fonte, tempo de banco e HTTP, comparação ao vivo com verificação de resultado idêntico, painel de benchmarks |
+| R14 | Demonstrar ao vivo uma consulta do dashboard que evidencie o ganho NoSQL | Instruções pp. 2-3, §§7,10 | Atendido: "Comparação ao vivo · Painel agregado" ([apresentacao/roteiro-demo.md](apresentacao/roteiro-demo.md)) |
+| R15 | Slides, código, README, modelos, scripts de criação/carga, consultas e índices, resultados brutos/planilha e evidência da massa | Instruções p. 3, §8 | Atendido: [apresentacao/slides.html](apresentacao/slides.html), README, `database/`, `scripts/`, `benchmarks/results/`, `data/bulk/reports/` |
 
 Explicar as consultas **SQL e CQL** usadas nos experimentos e no dashboard: parâmetros, índices/chaves, significado do resultado, consistência e justificativa da modelagem. Essa documentação concretiza a comparação de linguagens e a explicação técnica exigidas, não apenas a exposição dos tempos.
 
@@ -66,4 +66,4 @@ Não fabricar medições, retirar índices arbitrariamente ou configurar mal o c
 | Apresentação, demonstração e justificativa | 1,0 |
 | Total | 10,0 |
 
-Sugestão do PDF para os 20 minutos finais: 8 minutos de conceitos/comparação, 8 de demonstração e 4 de conclusões/perguntas. A Task 01 não deve ser apresentada como conclusão dos requisitos de CRUD, massa, experimentos ou dashboard definitivo.
+Sugestão do PDF para os 20 minutos finais: 8 minutos de conceitos/comparação, 8 de demonstração e 4 de conclusões/perguntas. A distribuição sugerida está em [apresentacao/roteiro-apresentacao.md](apresentacao/roteiro-apresentacao.md).

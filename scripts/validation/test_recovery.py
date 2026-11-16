@@ -31,12 +31,15 @@ def main() -> None:
         if result.returncode or any(token in result.stderr for token in (b"Exception", b"InvalidRequest", b"Error")):
             raise AssertionError("CQL fault injection failed")
 
-    status, _ = request("POST", "/api/cassandra/events", event)
-    assert status == 201, "Only inject faults into a newly created test-owned ID"
+    assert request("GET", path)[0] == 404, "Only inject faults into a fresh, never-seen test-owned ID"
     try:
-        # Simulate a crash after canonical reservation but before index acknowledgement.
-        cql(f"UPDATE cyberguard.events_by_id SET lifecycle='pending' WHERE event_id={event_id};\n"
-            f"DELETE FROM cyberguard.events_by_device_day WHERE device_id='{event['device_id']}' AND event_date='{event['event_date']}' AND occurred_at='{event['occurred_at']}' AND event_id={event_id};\n")
+        # Simulate a crash right after step 1 of CREATE: the canonical reservation is
+        # durable as 'pending', no projection was written and the activation (which is
+        # when the dashboard rollup counts the event) never happened. Repair must
+        # finish the projections, activate and count it exactly once.
+        payload = json.dumps({"data": event, "revision": 1}, separators=(",", ":")).replace("'", "''")
+        cql(f"INSERT INTO cyberguard.events_by_id (event_id, payload, revision, lifecycle) "
+            f"VALUES ({event_id}, '{payload}', 1, 'pending') IF NOT EXISTS;\n")
         assert request("GET", path)[0] == 503
         assert request("GET", query_path) == (200, {"items":[],"next_cursor":None})
         assert request("POST", path + "/repair") == (200, {"state": "active"})

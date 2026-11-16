@@ -1,6 +1,6 @@
 use axum::http::HeaderValue;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
-use std::{env, net::SocketAddr, time::Duration};
+use std::{env, net::SocketAddr, path::PathBuf, time::Duration};
 
 // Deliberately no Debug: configuration contains credentials.
 #[derive(Clone)]
@@ -10,6 +10,20 @@ pub struct Config {
     pub postgres: PgConnectOptions,
     pub cassandra_contact_point: String,
     pub storage_timeout: Duration,
+    /// Maximum canonical `events_by_id` reads in flight per Cassandra query page.
+    /// 1 reproduces the original sequential (N+1) behaviour for comparison.
+    pub cassandra_read_concurrency: usize,
+    /// Summary JSON written by `benchmarks/run_benchmarks.py`; served read-only.
+    pub benchmark_summary: PathBuf,
+    /// PostgreSQL `synchronous_commit` for API connections: `on` (default, fsync
+    /// at commit) or `off` (commit acknowledged before the WAL flush, like
+    /// Cassandra's periodic commitlog; loss window ~3 x wal_writer_delay instead
+    /// of Cassandra's ~10 s). Only for the write experiment variant.
+    pub postgres_synchronous_commit: &'static str,
+    /// Maximum PostgreSQL connections in the API pool. Must be >= the number of
+    /// concurrent clients in write benchmarks; the Cassandra driver multiplexes
+    /// requests on its connections and has no equivalent cap.
+    pub postgres_pool_size: u32,
 }
 
 impl Config {
@@ -41,12 +55,38 @@ impl Config {
             .password(&password)
             .database(&value("POSTGRES_DB", "cyberguard"))
             .ssl_mode(PgSslMode::Disable);
+        let cassandra_read_concurrency: usize =
+            value("CASSANDRA_READ_CONCURRENCY", "32")
+                .parse()
+                .map_err(|_| "CASSANDRA_READ_CONCURRENCY must be an integer")?;
+        if !(1..=128).contains(&cassandra_read_concurrency) {
+            return Err("CASSANDRA_READ_CONCURRENCY must be between 1 and 128".into());
+        }
+        let postgres_synchronous_commit = match value("POSTGRES_SYNCHRONOUS_COMMIT", "on").as_str()
+        {
+            "on" => "on",
+            "off" => "off",
+            _ => return Err("POSTGRES_SYNCHRONOUS_COMMIT must be on or off".into()),
+        };
+        let postgres_pool_size: u32 = value("POSTGRES_POOL_SIZE", "16")
+            .parse()
+            .map_err(|_| "POSTGRES_POOL_SIZE must be an integer")?;
+        if !(1..=64).contains(&postgres_pool_size) {
+            return Err("POSTGRES_POOL_SIZE must be between 1 and 64".into());
+        }
         Ok(Self {
             bind,
             frontend_origin,
             postgres,
             cassandra_contact_point: value("CASSANDRA_CONTACT_POINT", "127.0.0.1:9042"),
             storage_timeout: Duration::from_millis(timeout_ms),
+            cassandra_read_concurrency,
+            benchmark_summary: PathBuf::from(value(
+                "BENCHMARK_SUMMARY",
+                "benchmarks/results/summary.json",
+            )),
+            postgres_synchronous_commit,
+            postgres_pool_size,
         })
     }
 }

@@ -60,6 +60,28 @@ def psql(config: str | None, sql: str) -> list[str]:
                         sql)
 
 
+def cqlsh(config: str | None, *args: str) -> list[str]:
+    return compose_exec(config, "cassandra", "cqlsh", "127.0.0.1", "9042", *args)
+
+
+def stream_csv(command: list[str], **fmt):
+    """Yield CSV rows from a streamed export (psql/cqlsh COPY ... TO STDOUT); nothing is stored."""
+    import csv
+    import io
+    csv.field_size_limit(1 << 24)
+    proc = subprocess.Popen(command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    yield from csv.reader(io.TextIOWrapper(proc.stdout, encoding="utf-8", newline=""), **fmt)
+    stderr = proc.stderr.read()
+    if proc.wait() != 0 or any(t in stderr for t in (b"Exception", b"Error", b"Failed")):
+        raise RuntimeError(f"export failed ({command[-1][:60]}...)")
+
+
+def cql_copy(config: str | None, table: str, columns: str):
+    return stream_csv(cqlsh(config, "--request-timeout=120", "-e",
+                            f"COPY cyberguard.{table} ({columns}) TO STDOUT WITH HEADER=false AND PAGETIMEOUT=60"),
+                      escapechar="\\", doublequote=False)
+
+
 def run_text(command: list[str], timeout: int = 600) -> str:
     result = subprocess.run(command, cwd=ROOT, capture_output=True, timeout=timeout)
     if result.returncode != 0:

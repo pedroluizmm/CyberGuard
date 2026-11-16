@@ -66,11 +66,23 @@ Repetir o CREATE idêntico também conclui uma reserva pendente; repetir DELETE 
 
 Uma projeção obsoleta de evento inexistente/excluído não produz um evento fantasma porque a leitura consulta o registro canônico. Projeções ausentes podem omitir um evento até repair: não se promete que um batch pendente já esteja visível. Conteúdo canônico inválido retorna 503 `storage_inconsistent`. Excesso de candidatos obsoletos retorna 503 `scan_limit` após 1000 candidatos por página.
 
+## Rollup do painel
+
+`event_counts_by_day` (Cassandra) é derivada. A autoridade continua sendo `events_by_id`.
+
+- **Quando conta:** somente a requisição cuja LWT foi aplicada (`[applied]=true`) altera o contador: +1 em `pending→active`, −1 em `deleting→deleted`. Retries de CREATE ou DELETE e repairs que encontram a transição já feita não contam de novo. Isso está coberto por `test_integration.py::test_08`.
+- **Por que pode desviar:** contadores Cassandra não são idempotentes, e o driver não os reenvia automaticamente. Se a API cair entre a LWT e o incremento, ou se o incremento falhar, o evento continua correto, mas o painel fica com um a menos. A falha é registrada em log (`rollup_update_failed`) e a requisição não falha, porque a escrita do evento já foi confirmada.
+- **Como corrigir:** `python scripts/loading/reconcile_rollup.py --apply`, com a API ociosa. O script recalcula a verdade a partir de `events_by_id` (estados `active` e `deleting`) e aplica só a diferença, então é seguro repetir. Ele também compara com a agregação independente do PostgreSQL.
+- **Evidências:**
+  - O backfill de 1 M de eventos gravou 9 978 células, com o PostgreSQL igual célula a célula (`data/bulk/reports/rollup-reconcile-20261115T052013Z.json`).
+  - A versão anterior do `test_recovery.py` reescrevia um evento já ativo para `pending`, um estado que uma queda real não produz, e gerou +1 de desvio. O desvio foi detectado e corrigido pela reconciliação (`…052502Z.json`), e o teste foi ajustado para injetar a reserva `pending` ainda não contada.
+- O PostgreSQL agrega na leitura e, por isso, é sempre exato. Essa diferença de garantias é um dos trade-offs apresentados.
+
 ## Limites operacionais
 
 - Uma instância de API é o cenário suportado e validado. Há 128 locks locais por faixa de UUID/fonte para evitar intercalar um workflow do mesmo ID na mesma instância, sem alocação ilimitada de locks. PostgreSQL/LWT continuam sendo os controles duráveis; locks locais não coordenam processos distintos.
 - Múltiplas instâncias, escritores CQL/SQL externos, pausas entre projeções e mudanças de relógio não foram certificados. LWT impede sobrescrever revisões/estados incompatíveis, mas não oferece fencing entre todos os batches de vários processos. Antes de múltiplos escritores, desenhar coordenação/reconciliação e testar corridas entre repair, CREATE e DELETE. Índices antigos podem exigir limpeza direcionada, mesmo quando a autoridade canônica impede exposição lógica.
-- PostgreSQL usa pool de até cinco conexões, timeout de aquisição configurado, `statement_timeout=15000ms` e `lock_timeout=5000ms`. Cassandra usa sessão reutilizável e cache limitado de 32 instruções preparadas, inicializados sob demanda. Os healthchecks originais permanecem independentes dessas conexões de negócio.
+- PostgreSQL usa pool de até `POSTGRES_POOL_SIZE` conexões (padrão 16; era 5 até a auditoria final), timeout de aquisição configurado, `statement_timeout=15000ms` e `lock_timeout=5000ms`. Cassandra usa sessão reutilizável e cache limitado de 32 instruções preparadas, inicializados sob demanda. Os healthchecks originais permanecem independentes dessas conexões de negócio.
 - Cada requisição de CRUD/consulta tem deadline de 30 segundos; expirar o cliente não prova rollback no servidor. HTTP 503 `operation_timeout`/`storage_unavailable` pode representar escrita de resultado incerto. O cliente deve ler/reparar o mesmo ID, nunca gerar outro UUID automaticamente como retry.
 - Não há autenticação de usuários na API; é laboratório em loopback. `repair` é ferramenta administrativa local. CORS permite a origem local configurada e métodos GET/POST/PUT/DELETE com Content-Type; isso não é autenticação.
 

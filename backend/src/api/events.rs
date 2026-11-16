@@ -1,6 +1,6 @@
 use super::AppState;
 use crate::{
-    analytics::{EventPage, EventQuery, QueryParams},
+    analytics::{EventPage, EventQuery, Overview, OverviewParams, OverviewQuery, QueryParams},
     domain::{self, Event, EventData, UpdateEvent},
     error::{Error, Result},
     storage::repository::Source,
@@ -11,12 +11,16 @@ use axum::{
         Path, Query, State,
         rejection::{JsonRejection, QueryRejection},
     },
-    http::StatusCode,
+    http::{HeaderName, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
 };
 use serde::Deserialize;
 use serde_json::json;
-use std::{future::Future, sync::Arc, time::Duration};
+use std::{
+    future::Future,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
@@ -40,7 +44,7 @@ impl IntoResponse for Error {
             Self::Unavailable => (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "storage_unavailable",
-                "Storage unavailable; a write may have completed. Read the ID before retrying",
+                "Storage unavailable. If this was a write, it may have completed: read the ID before retrying",
             ),
             Self::Corrupt => (
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -73,6 +77,20 @@ async fn bounded<T>(operation: impl Future<Output = Result<T>>) -> Result<T> {
         .map_err(|_| Error::Timeout)?
 }
 
+pub type Timing = [(HeaderName, HeaderValue); 1];
+
+/// `Server-Timing: db;dur=<ms>`: monotonic time spent in the storage adapter
+/// (driver, network to the container, database work and row decoding). HTTP,
+/// JSON serialization and client time are excluded and measured by the client.
+async fn timed<T>(operation: impl Future<Output = Result<T>>) -> Result<(Timing, T)> {
+    let start = Instant::now();
+    let value = bounded(operation).await?;
+    let millis = start.elapsed().as_secs_f64() * 1000.0;
+    let header = HeaderValue::from_str(&format!("db;dur={millis:.3}"))
+        .unwrap_or_else(|_| HeaderValue::from_static("db"));
+    Ok(([(HeaderName::from_static("server-timing"), header)], value))
+}
+
 pub async fn create(
     State(state): State<Arc<AppState>>,
     Path(source): Path<String>,
@@ -102,15 +120,10 @@ pub async fn create(
 pub async fn get(
     State(state): State<Arc<AppState>>,
     Path((source, id)): Path<(String, String)>,
-) -> Result<Json<Event>> {
-    Ok(Json(
-        bounded(
-            state
-                .repositories
-                .get(Source::parse(&source)?, domain::parse_id(&id)?),
-        )
-        .await?,
-    ))
+) -> Result<(Timing, Json<Event>)> {
+    let (source, id) = (Source::parse(&source)?, domain::parse_id(&id)?);
+    let (timing, event) = timed(state.repositories.get(source, id)).await?;
+    Ok((timing, Json(event)))
 }
 
 pub async fn update(
@@ -161,14 +174,28 @@ pub async fn query(
     State(state): State<Arc<AppState>>,
     Path((source, kind)): Path<(String, String)>,
     params: std::result::Result<Query<QueryParams>, QueryRejection>,
-) -> Result<Json<EventPage>> {
+) -> Result<(Timing, Json<EventPage>)> {
     let source = Source::parse(&source)?;
     let params = params
         .map_err(|_| Error::Invalid("invalid query parameters"))?
         .0;
     let query = EventQuery::parse(&kind, params)?;
-    let events = bounded(state.repositories.query(source, &query)).await?;
-    Ok(Json(query.page(events)?))
+    let (timing, events) = timed(state.repositories.query(source, &query)).await?;
+    Ok((timing, Json(query.page(events)?)))
+}
+
+pub async fn overview(
+    State(state): State<Arc<AppState>>,
+    Path(source): Path<String>,
+    params: std::result::Result<Query<OverviewParams>, QueryRejection>,
+) -> Result<(Timing, Json<Overview>)> {
+    let source = Source::parse(&source)?;
+    let params = params
+        .map_err(|_| Error::Invalid("overview accepts from, to, category and severity"))?
+        .0;
+    let query = OverviewQuery::parse(params)?;
+    let (timing, cells) = timed(state.repositories.overview(source, &query)).await?;
+    Ok((timing, Json(query.build(cells)?)))
 }
 
 pub async fn repair(

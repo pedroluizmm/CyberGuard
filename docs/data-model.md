@@ -91,11 +91,17 @@ erDiagram
 - `devices` representa a identidade do dispositivo. A API registra a identidade quando recebe seu primeiro evento. A FK impede referências inexistentes; não se inventam dados de inventário. A exclusão de um evento não exclui automaticamente o dispositivo.
 - `event_registry` reserva o UUID e mantém um marcador depois do DELETE, impedindo que retries antigos recriem eventos. A relação permite zero eventos para uma reserva excluída. CREATE/DELETE mantêm reserva e evento na mesma transação.
 - PKs e FKs usam `RESTRICT`; não há exclusões em cascata. CHECKs validam UUID v4, data UTC, precisão temporal, endereço de host, severidade, enums e combinação categoria/tipo. Limites de profundidade/tamanho JSON e imutabilidade são garantidos também pela API; escritas diretas fora dela não pertencem ao contrato suportado.
-- Índices B-tree: `(device_id, occurred_at DESC, event_id DESC)` para Q1; `(source_ip, occurred_at DESC, event_id DESC)` para Q2; `(severity, occurred_at DESC, event_id DESC) WHERE category='alert'` para Q3. Igualdade antecede intervalo e desempate. O índice parcial evita indexar não-alertas. A PK atende READ/UPDATE/DELETE por UUID.
+- Índices B-tree:
+  - `(device_id, occurred_at DESC, event_id DESC)` para Q1;
+  - `(source_ip, occurred_at DESC, event_id DESC)` para Q2;
+  - `(severity, occurred_at DESC, event_id DESC) WHERE category='alert'` para Q3, um índice parcial que evita indexar não-alertas.
+
+  Nos três, a igualdade vem antes do intervalo e do desempate. A PK atende READ/UPDATE/DELETE por UUID.
+- Painel (Task 04, `002_dashboard.sql`): `events_time_cover_idx (occurred_at) INCLUDE (category, severity)`, com 42 MB em 1 M de eventos. É um índice de cobertura: a agregação por hora, categoria e severidade é respondida por *index-only scan*, sem ler o heap. O modelo relacional continua normalizado e agrega na leitura. Uma view materializada foi medida apenas como controle (E5) e não faz parte do esquema.
 
 ### Crescimento PostgreSQL
 
-A estratégia inicial é tabela não particionada com índices adequados, pool limitado e consultas paginadas. Não se antecipa particionamento sem medir volume, retenção, índices e planos. A Task 03 deve acompanhar tamanho de tabela/índices, autovacuum e distribuição temporal. Se retenção e volume justificarem particionamento mensal, migrar de forma aditiva, mantendo unicidade global via registro de UUIDs e acrescentando um localizador temporal; uma PK particionada normalmente precisa incluir a chave de partição. Não retirar índices para favorecer Cassandra. Na massa de 1 M: `events` com 651,7 MB (heap de 461 MB + índices de 191 MB), `event_registry` com 91,9 MB e banco com 751,7 MB, ainda sem particionamento; Q1–Q3 usam *Index Only Scan* nos índices previstos ([verification-task03.md](verification-task03.md)).
+A estratégia inicial é tabela não particionada com índices adequados, pool limitado e consultas paginadas. Não se antecipa particionamento sem medir volume, retenção, índices e planos. A Task 03 deve acompanhar tamanho de tabela/índices, autovacuum e distribuição temporal. Se retenção e volume justificarem particionamento mensal, migrar de forma aditiva, mantendo unicidade global via registro de UUIDs e acrescentando um localizador temporal; uma PK particionada normalmente precisa incluir a chave de partição. Não retirar índices para favorecer Cassandra. Na massa de 1 M: `events` com 651,7 MB (heap de 461 MB + índices de 191 MB), `event_registry` com 91,9 MB e banco com 751,7 MB, ainda sem particionamento; Q1–Q3 usam *Index Only Scan* nos índices previstos ([verification-task03.md](verification/verification-task03.md)).
 
 ## Cassandra
 
@@ -110,7 +116,10 @@ flowchart LR
     D -->|"IDs; leitura canonica"| C
     I -->|"IDs; leitura canonica"| C
     A -->|"IDs; leitura canonica"| C
+    E --> R["event_counts_by_day (Task 04)\nPartition: event_date\nClustering: hour, category, severity\ncounter events"]
 ```
+
+`event_counts_by_day` é a tabela do painel, modelada a partir da consulta. Cada data UTC é uma partição com no máximo 24 × 15 contadores; em 1 M de eventos, são 9 978 células. A API incrementa o contador quando vence a transição `pending→active` e o decrementa em `deleting→deleted`. Somente campos imutáveis são dimensões: `outcome` é mutável e por isso ficou fora. Essa é a desnormalização típica do wide-column: a resposta é escrita pronta, e o painel lê até 7 partições pequenas em vez de varrer eventos. A semântica do contador e a reconciliação estão em [consistency.md](consistency.md#rollup-do-painel).
 
 Setas representam manutenção/leitura pela aplicação, **não FKs ou joins nativos**. `events_by_id` localiza um evento sem conhecer suas chaves de consulta e guarda seu envelope JSON validado, revisão e estado durável. As três projeções armazenam apenas as chaves imutáveis, com `date`, `timestamp`, `inet`, `smallint` e `uuid` nativos. O conteúdo mutável é lido da linha canônica: não se espalham cópias divergentes de mensagem/metadados por várias tabelas. Essa decisão troca menor amplificação de UPDATE por consultas adicionais por resultado.
 
@@ -122,10 +131,10 @@ Dispositivo/dia e IP/dia distribuem os padrões Q1/Q2, mas um sensor muito ativo
 
 A Task 03 deve medir linhas e bytes por partição nas cargas progressivas. Usar limites de projeto iniciais (não resultados medidos) de aproximadamente 100 mil chaves ou 50 MiB por partição para acionar revisão. Se necessário, introduzir bucket horário e/ou shard derivado do UUID, com fan-out e merge explicitamente limitados. Não implementar shards agora para 24 eventos nem prometer escalabilidade com um único nó.
 
-**Medido na Task 03 (1 M de eventos):** maior partição `events_by_device_day` com 11 822 linhas (histograma do Cassandra: ≤ 455 KB); `events_by_ip_day` com 11 517; `alerts_by_severity_day` com 1 320 (≤ 42,5 KB). Todas ficam muito abaixo dos limiares acima, e por isso não foram introduzidos buckets/shards. Detalhes em [verification-task03.md](verification-task03.md).
+**Medido na Task 03 (1 M de eventos):** maior partição `events_by_device_day` com 11 822 linhas (histograma do Cassandra: ≤ 455 KB); `events_by_ip_day` com 11 517; `alerts_by_severity_day` com 1 320 (≤ 42,5 KB). Todas ficam muito abaixo dos limiares acima, e por isso não foram introduzidos buckets/shards. Detalhes em [verification-task03.md](verification/verification-task03.md).
 
 ### Contagens e amplificação
 
-Para `N` eventos ativos e `A` alertas, há `N` linhas canônicas, `N` de dispositivo, `N` de IP e `A` de alertas: **`3N + A` linhas ativas**. A amostra de 24 eventos/9 alertas corresponde a 81 linhas ativas. Marcadores de exclusão por ID, tombstones internos e linhas de dispositivos PostgreSQL não são eventos lógicos adicionais.
+Para `N` eventos ativos e `A` alertas, há `N` linhas canônicas, `N` de dispositivo, `N` de IP e `A` de alertas: **`3N + A` linhas ativas**. O rollup soma até `24 × 15` células por data com eventos. Elas não são eventos lógicos. A amostra de 24 eventos/9 alertas corresponde a 81 linhas ativas. Marcadores de exclusão por ID, tombstones internos e linhas de dispositivos PostgreSQL não são eventos lógicos adicionais.
 
 CREATE Cassandra inclui reserva condicional, batch de duas/três projeções e ativação condicional. UPDATE muda somente a linha canônica. DELETE faz transição condicional, remove duas/três projeções e apaga o payload, preservando o UUID reservado. Isso tem custo superior a apenas contar linhas inseridas; registrar todas as etapas em qualquer experimento futuro. A [política de consistência](consistency.md) detalha falhas e recuperação.

@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CyberGuard · Apresentação final</title>
+<!-- Deck autocontido (sem dependências externas). Navegação: ← → / espaço / PageUp/PageDown / Home/End.
+     Imprimir em PDF: Ctrl+P, destino "Salvar como PDF", margens "Nenhuma", gráficos de fundo ativados.
+     Números: benchmarks/results/20261115T053008Z-main (+ -n1, -durability) e data/bulk/reports. -->
+<style>
+  :root {
+    --page:#070c0f; --bg:#0b1115; --surface:#10191e; --surface-2:#142027; --line:#243037; --grid:#1c272d;
+    --text:#e6ecec; --text-2:#b4c1c6; --muted:#85939c; --accent:#a8eb83;
+    --pg:#9085e9; --cs:#c98500; --auth:#3987e5; --net:#d95926; --alert:#199e70;
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--page); color: var(--text); overflow: hidden; }
+  #deck { position: absolute; top: 50%; left: 50%; width: 1280px; height: 720px; transform-origin: 0 0; }
+  .slide { position: absolute; inset: 0; background: var(--bg); padding: 56px 72px 48px; display: none; flex-direction: column; border: 1px solid var(--line); }
+  .slide.on { display: flex; }
+  .slide h1 { font-size: 44px; line-height: 1.1; margin: 0 0 14px; letter-spacing: -.01em; }
+  .slide h2 { font-size: 32px; margin: 0 0 22px; letter-spacing: -.01em; }
+  .slide h3 { font-size: 18px; margin: 0 0 8px; color: var(--text); }
+  .eyebrow { font-size: 13px; letter-spacing: .16em; color: var(--accent); font-weight: 650; margin-bottom: 12px; text-transform: uppercase; }
+  p, li { font-size: 19px; line-height: 1.5; color: var(--text-2); margin: 0 0 8px; }
+  ul { margin: 0; padding-left: 22px; }
+  li::marker { color: var(--accent); }
+  strong { color: var(--text); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; flex: 1; min-height: 0; }
+  .cols3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+  .card p, .card li { font-size: 16.5px; }
+  .big { font-size: 64px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -.02em; }
+  .unit { font-size: 22px; color: var(--muted); font-weight: 500; }
+  table { border-collapse: collapse; width: 100%; font-size: 15.5px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  td { padding: 7px 10px; border-bottom: 1px solid var(--grid); color: var(--text-2); vertical-align: top; }
+  td strong { color: var(--text); }
+  .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .foot { margin-top: auto; font-size: 12.5px; color: var(--muted); display: flex; justify-content: space-between; padding-top: 14px; }
+  .tag { display: inline-block; font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--text-2); margin: 0 6px 6px 0; }
+  .key { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+  .pg { background: var(--pg); } .cs { background: var(--cs); }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: .88em; background: var(--surface-2); padding: 1px 6px; border-radius: 4px; color: var(--text); }
+  .diagram { font-family: ui-monospace, Consolas, monospace; font-size: 14.5px; line-height: 1.55; color: var(--text-2); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; white-space: pre; align-self: start; }
+  /* bar rows */
+  .bars { display: grid; gap: 12px; }
+  .row { display: grid; grid-template-columns: 300px 1fr 90px; gap: 14px; align-items: center; }
+  .row .label { font-size: 15px; color: var(--text-2); }
+  .pair { display: grid; gap: 4px; padding-right: 96px; }
+  .bar { height: 12px; border-radius: 0 4px 4px 0; min-width: 2px; position: relative; }
+  .bar span { position: absolute; left: calc(100% + 8px); top: -3px; font-size: 13px; color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ratio { font-size: 17px; font-weight: 650; color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+  .ratio small { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+  #counter { position: fixed; right: 16px; bottom: 12px; color: var(--muted); font-size: 13px; }
+  @media print {
+    @page { size: 1280px 720px; margin: 0; }
+    html, body { overflow: visible; height: auto; background: var(--bg); }
+    #deck { position: static; transform: none !important; width: auto; height: auto; }
+    .slide { display: flex !important; position: relative; width: 1280px; height: 720px; page-break-after: always; break-after: page; border: 0; }
+    #counter { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="deck">
+
+<!-- 1 -->
+<section class="slide">
+  <div class="eyebrow">Projeto 3 · Banco de Dados NoSQL · UNIFOR</div>
+  <h1>CyberGuard<br><span style="color:var(--text-2);font-weight:500">Eventos de segurança em Apache Cassandra e PostgreSQL</span></h1>
+  <p style="max-width:860px">Paradigma sorteado: <strong>orientado a colunas (wide-column)</strong>. O mesmo cenário foi implementado nos dois bancos, com 1 milhão de eventos, experimentos reprodutíveis e um dashboard que consulta os dados reais.</p>
+  <div style="margin-top:28px"><span class="tag">Cassandra 5.0.9</span><span class="tag">PostgreSQL 17.11</span><span class="tag">Rust · Axum</span><span class="tag">Svelte 5</span><span class="tag">Python</span><span class="tag">Docker / WSL 2</span></div>
+  <div class="foot"><span>Pedro Luiz e Paulo Henrico - paradigma 1 (wide-column)</span><span>24/11/2026</span></div>
+</section>
+
+<!-- 2 -->
+<section class="slide">
+  <div class="eyebrow">Definição do problema</div>
+  <h2>Um SOC precisa ingerir e investigar eventos o tempo todo</h2>
+  <div class="cols">
+    <div>
+      <p>Sensores (firewall, VPN, controlador de domínio, IDS, EDR, servidores) emitem eventos de <strong>autenticação</strong>, <strong>rede</strong> e <strong>alerta</strong>.</p>
+      <ul>
+        <li><strong>Q1</strong>: histórico de um dispositivo</li>
+        <li><strong>Q2</strong>: atividade de um IP de origem</li>
+        <li><strong>Q3</strong>: alertas de uma severidade</li>
+        <li><strong>Painel</strong>: eventos por hora, categoria e severidade</li>
+        <li>CRUD com revisão; UUID excluído nunca é reutilizado</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Registro lógico = 1 evento (UUID v4)</h3>
+      <p>Campos imutáveis: horário UTC (ms), dispositivo, IP, categoria, tipo e severidade. Campos mutáveis: resultado, mensagem e metadados.</p>
+      <p>Por que wide-column? É uma <strong>série temporal de escrita intensa</strong>, consultada por chaves conhecidas e janelas de tempo, e alimenta um painel agregado. É o caso de uso clássico de partição + clustering.</p>
+    </div>
+  </div>
+  <div class="foot"><span>docs/entregas/17-11-vantagens-problema-modelagem.md</span><span>2</span></div>
+</section>
+
+<!-- 3 -->
+<section class="slide">
+  <div class="eyebrow">Paradigma</div>
+  <h2>Wide-column: partições ordenadas, desenhadas para a consulta</h2>
+  <div class="cols">
+    <div>
+      <ul>
+        <li>A <strong>chave de partição</strong> define o nó; as colunas de <strong>clustering</strong> ordenam as linhas dentro da partição.</li>
+        <li>Herdado do <strong>Bigtable</strong> (2006): modelo de dados e armazenamento LSM.</li>
+        <li>Herdado do <strong>Dynamo</strong> (2007): anel sem mestre, replicação e consistência ajustável.</li>
+        <li>Representantes: Cassandra, ScyllaDB, HBase, Bigtable.</li>
+      </ul>
+      <p style="margin-top:14px"><strong>Bom para:</strong> séries temporais, IoT, logs e eventos, mensagens, feeds, contadores.<br><strong>Ruim para:</strong> joins, consultas ad hoc, transações entre entidades.</p>
+    </div>
+    <div class="diagram">exemplo ilustrativo (IDs/horários abreviados)
+
+PRIMARY KEY ((device_id, event_date),
+             occurred_at DESC, event_id DESC)
+
+partição "ids-sensor-06 | 2026-10-27"
+ ├─ 23:59:58.120  b41f…   ← mais recente
+ ├─ 23:59:57.004  0c9a…
+ ├─ …            (ordenado em disco)
+ └─ 00:00:03.511  7e21…
+
+uma consulta = uma fatia contígua</div>
+  </div>
+  <div class="foot"><span>docs/entregas/10-11-pesquisa-cassandra.md</span><span>3</span></div>
+</section>
+
+<!-- 4 -->
+<section class="slide">
+  <div class="eyebrow">Apache Cassandra</div>
+  <h2>Arquitetura sem mestre e escrita em LSM</h2>
+  <div class="cols">
+    <div>
+      <ul>
+        <li><strong>Anel peer-to-peer:</strong> <code>token = Murmur3(partition key)</code>; vnodes; gossip.</li>
+        <li><strong>Replicação</strong> por keyspace/datacenter (<code>NetworkTopologyStrategy</code>).</li>
+        <li><strong>Consistência ajustável</strong>: <code>ONE</code>, <code>QUORUM</code>, <code>LOCAL_QUORUM</code>… Com R + W &gt; RF, as leituras são consistentes.</li>
+        <li><strong>LWT (Paxos)</strong> para condições em uma partição; batch não é transação.</li>
+        <li>Reparo: hinted handoff, read repair, <code>nodetool repair</code>.</li>
+      </ul>
+    </div>
+    <div class="diagram">Escrita (sem ler antes de escrever)
+ commit log (append) ─┐
+ memtable (RAM) ──────┴─► ACK
+        │ flush
+        ▼
+ SSTables imutáveis ──► compactação
+                         (STCS / LCS / TWCS / UCS)
+
+Leitura
+ memtable + SSTables (bloom filter,
+ key cache) ──► fusão por timestamp</div>
+  </div>
+  <div class="foot"><span>Licença Apache 2.0 · cassandra.apache.org · Cassandra 5.0: SAI, vetores, UCS, trie memtables</span><span>4</span></div>
+</section>
+
+<!-- 5 -->
+<section class="slide">
+  <div class="eyebrow">Escalabilidade e mercado</div>
+  <h2>Escala horizontal linear, sem ponto único de falha</h2>
+  <div class="cols3">
+    <div class="card"><h3>Escalabilidade</h3><p>Novos nós assumem faixas de tokens. Com RF ≥ 3, o cluster tolera falhas e é multi-datacenter nativo. Limite: partições grandes ou quentes concentram carga.</p></div>
+    <div class="card"><h3>Mercado (relatos públicos)</h3><p>Apple, Netflix, Instagram, Uber. O Discord migrou do Cassandra para o ScyllaDB, também wide-column, por custos de operação.</p></div>
+    <div class="card"><h3>Fornecedor e licença</h3><p>Apache Software Foundation, Apache 2.0, download livre. Há ofertas comerciais e gerenciadas (DataStax, serviços compatíveis com CQL na nuvem).</p></div>
+  </div>
+  <div class="card" style="margin-top:22px;border-color:#c9850066"><p><strong>Neste projeto há um único nó.</strong> Ele avalia modelagem e consultas, mas <strong>não</strong> demonstra escalabilidade, replicação nem tolerância a falhas. Esses aspectos são tratados apenas na teoria.</p></div>
+  <div class="foot"><span>docs/entregas/10-11-pesquisa-cassandra.md</span><span>5</span></div>
+</section>
+
+<!-- 6 -->
+<section class="slide">
+  <div class="eyebrow">Comparação técnica</div>
+  <h2>Relacional × wide-column</h2>
+  <table>
+    <tr><th></th><th>PostgreSQL</th><th>Cassandra</th></tr>
+    <tr><td><strong>Modelo</strong></td><td>Tabelas normalizadas, esquema tipado</td><td>Tabelas particionadas, uma por consulta</td></tr>
+    <tr><td><strong>Relações</strong></td><td>FKs, joins, integridade referencial</td><td>Sem joins nem FKs; a aplicação mantém as cópias</td></tr>
+    <tr><td><strong>Linguagem</strong></td><td>SQL completo, agregações ad hoc</td><td>CQL: partição obrigatória, intervalos no clustering</td></tr>
+    <tr><td><strong>Transações</strong></td><td>ACID multitabela, MVCC</td><td>LWT por partição; consistência ajustável</td></tr>
+    <tr><td><strong>Índices</strong></td><td>B-tree, parcial, de cobertura…</td><td>A chave primária é o índice; desnormalização</td></tr>
+    <tr><td><strong>Escrita</strong></td><td>WAL + B-tree no lugar; fsync por commit</td><td>Commit log + memtable; fsync periódico</td></tr>
+    <tr><td><strong>Escala</strong></td><td>Vertical + réplicas de leitura</td><td>Horizontal linear, multi-datacenter</td></tr>
+  </table>
+  <div class="foot"><span>docs/entregas/17-11-vantagens-problema-modelagem.md</span><span>6</span></div>
+</section>
+
+<!-- 7 -->
+<section class="slide">
+  <div class="eyebrow">Modelagem</div>
+  <h2>O mesmo evento, duas organizações físicas</h2>
+  <div class="cols" style="flex:0">
+    <div>
+      <h3><span class="key pg"></span>PostgreSQL: normalizado</h3>
+      <div class="diagram" style="font-size:13.5px">devices(device_id PK)
+event_registry(event_id PK, deleted)
+events(event_id PK FK, occurred_at,
+       device_id FK, source_ip inet,
+       category, severity, outcome,
+       message, metadata jsonb, revision)
+
+idx (device_id, occurred_at↓, id↓)   Q1
+idx (source_ip, occurred_at↓, id↓)   Q2
+idx (severity, …) WHERE alert       Q3
+idx (occurred_at) INCLUDE (cat,sev) painel</div>
+    </div>
+    <div>
+      <h3><span class="key cs"></span>Cassandra: uma tabela por consulta</h3>
+      <div class="diagram" style="font-size:13.5px">events_by_id        ((event_id))
+  payload, revision, lifecycle  ← canônico
+events_by_device_day  ((device, dia), ts↓, id↓)
+events_by_ip_day      ((ip, dia), ts↓, id↓)
+alerts_by_severity_day((sev, dia), ts↓, id↓)
+event_counts_by_day   ((dia), hora, cat, sev)
+  events counter                ← painel
+
+pending → active → deleting → deleted (LWT)</div>
+    </div>
+  </div>
+  <p style="margin-top:12px;font-size:16px">As projeções guardam só chaves imutáveis, e o conteúdo vem do registro canônico: um UPDATE escreve 1 linha, sem cópias divergentes. O painel fica pronto no momento da escrita.</p>
+  <div class="foot"><span>docs/data-model.md · database/*</span><span>7</span></div>
+</section>
+
+<!-- 8 -->
+<section class="slide">
+  <div class="eyebrow">Massa de dados (19/11)</div>
+  <h2>1 000 000 de eventos lógicos, iguais nos dois bancos</h2>
+  <div class="cols3">
+    <div class="card"><div class="big">1 M</div><p>eventos sintéticos determinísticos (seed 20261109): 28 dias, 393 dispositivos, 20 campanhas de ataque, 82 443 alertas</p></div>
+    <div class="card"><div class="big">22/22</div><p>verificações: conteúdo integral, IDs, projeções, <code>3N + A</code> = 3 082 443 linhas, partições, 500 READs e Q1–Q3 iguais</p></div>
+    <div class="card"><div class="big">9 978</div><p>células no rollup do painel. A agregação do PostgreSQL é <strong>idêntica célula a célula</strong></p></div>
+  </div>
+  <table style="margin-top:22px">
+    <tr><th>Carga via API (debug, não é benchmark)</th><th>PostgreSQL</th><th>Cassandra</th></tr>
+    <tr><td>900 mil eventos novos até 1 M</td><td class="num">1 717 s · 524 ev/s</td><td class="num">1 516 s · 594 ev/s</td></tr>
+    <tr><td>Espaço principal</td><td class="num">events 696 MB · banco 797 MB</td><td class="num">canônico 261 MB + projeções 69 MB</td></tr>
+  </table>
+  <div class="foot"><span>docs/entregas/19-11-massa-carga-dados.md · data/bulk/reports</span><span>8</span></div>
+</section>
+
+<!-- 9 -->
+<section class="slide">
+  <div class="eyebrow">Metodologia experimental</div>
+  <h2>Mesma requisição, mesma massa, medição em duas fronteiras</h2>
+  <div class="cols">
+    <ul>
+      <li><strong>5 aquecimentos + 30 medições</strong> por operação e banco</li>
+      <li><strong>Pares intercalados</strong>, com ordem alternada a cada iteração</li>
+      <li><strong>http_ms</strong> no cliente e <strong>db_ms</strong> via <code>Server-Timing</code> (driver + banco)</li>
+      <li>Hash de cada resposta: <strong>resultado idêntico</strong> exigido</li>
+      <li>API em build release; cache quente; ambiente registrado em <code>environment.json</code></li>
+      <li>PostgreSQL com todos os índices + índice de cobertura + <code>VACUUM ANALYZE</code>; a SQL mais rápida de 3 variantes</li>
+    </ul>
+    <div class="card">
+      <h3>Ambiente</h3>
+      <p>Intel Core Ultra 7 155H · 22 CPUs · 15,4 GiB<br>Docker Engine 29.4 (Desktop) · VM WSL 2: 22 vCPU / 7,4 GiB<br>PostgreSQL 17.11: 2 GiB, shared_buffers 512MB<br>Cassandra 5.0.9: 5 GiB, heap 2 GiB, 1 nó, RF=1</p>
+      <p style="margin-top:10px">Execução <code>20261115T053008Z-main</code>, replicada por <code>…052604Z-main</code>, com os mesmos vencedores.</p>
+    </div>
+  </div>
+  <div class="foot"><span>docs/benchmark-methodology.md · benchmarks/results</span><span>9</span></div>
+</section>
+
+<!-- 10 -->
+<section class="slide">
+  <div class="eyebrow">Resultados · leituras por chave (E1–E3)</div>
+  <h2>Busca por chave e paginação: o PostgreSQL vence</h2>
+  <p style="font-size:15px;margin-bottom:16px"><span class="key pg"></span>PostgreSQL <span class="key cs" style="margin-left:14px"></span>Cassandra · mediana HTTP (ms), 30 execuções cada; o PostgreSQL venceu 30/30 pares em todas</p>
+  <div class="bars">
+    <div class="row"><span class="label">E1 · READ por UUID</span><div class="pair"><div class="bar pg" style="width:84%"><span>1,19</span></div><div class="bar cs" style="width:100%"><span>1,41</span></div></div><span class="ratio">PG 1,2×</span></div>
+    <div class="row"><span class="label">E2 · Q1 dispositivo, página 100</span><div class="pair"><div class="bar pg" style="width:53%"><span>3,91</span></div><div class="bar cs" style="width:100%"><span>7,33</span></div></div><span class="ratio">PG 1,9×</span></div>
+    <div class="row"><span class="label">E2 · Q1 10 páginas (1 000)</span><div class="pair"><div class="bar pg" style="width:40%"><span>34,2</span></div><div class="bar cs" style="width:100%"><span>85,6</span></div></div><span class="ratio">PG 2,5×</span></div>
+    <div class="row"><span class="label">E2 · Q1 dispositivo pouco ativo</span><div class="pair"><div class="bar pg" style="width:25%"><span>2,70</span></div><div class="bar cs" style="width:100%"><span>10,8</span></div></div><span class="ratio">PG 4,0×</span></div>
+    <div class="row"><span class="label">E3 · Q2 IP de campanha</span><div class="pair"><div class="bar pg" style="width:38%"><span>3,73</span></div><div class="bar cs" style="width:100%"><span>9,91</span></div></div><span class="ratio">PG 2,7×</span></div>
+    <div class="row"><span class="label">E3 · Q3 alertas severidade 3</span><div class="pair"><div class="bar pg" style="width:49%"><span>3,59</span></div><div class="bar cs" style="width:100%"><span>7,26</span></div></div><span class="ratio">PG 2,0×</span></div>
+  </div>
+  <p style="margin-top:18px;font-size:16.5px"><strong>Por quê:</strong> o índice B-tree devolve a página completa em uma consulta. No Cassandra, a projeção só tem chaves, e cada resultado exige 1 leitura do registro canônico, uma escolha deliberada para não duplicar conteúdo mutável.</p>
+  <div class="foot"><span>Barras proporcionais dentro de cada linha</span><span>10</span></div>
+</section>
+
+<!-- 11 -->
+<section class="slide">
+  <div class="eyebrow">Resultado · cenário favorável ao NoSQL (E4)</div>
+  <h2>Painel do SOC: rollup Cassandra de 7× a 22× mais rápido</h2>
+  <div class="cols">
+    <div>
+      <div class="card" style="margin-bottom:16px"><p style="margin:0">Painel 7 dias · 244 881 eventos · mediana HTTP</p>
+        <div style="display:flex;gap:40px;margin-top:12px">
+          <div><span class="key pg"></span><span class="big" style="font-size:52px">71,9</span><span class="unit"> ms</span></div>
+          <div><span class="key cs"></span><span class="big" style="font-size:52px">3,3</span><span class="unit"> ms</span></div>
+        </div>
+        <p style="margin-top:10px"><strong>21,9×</strong> · 30/30 pares · resposta idêntica</p>
+      </div>
+      <table>
+        <tr><th>Painel</th><th>PG</th><th>CS</th><th></th></tr>
+        <tr><td>1 dia (48 193)</td><td class="num">15,6 ms</td><td class="num">2,2 ms</td><td class="num"><strong>7,1×</strong></td></tr>
+        <tr><td>7 dias, só alertas</td><td class="num">45,5 ms</td><td class="num">3,5 ms</td><td class="num"><strong>12,9×</strong></td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Por quê: pré-agregação na escrita</h3>
+      <ul>
+        <li>PostgreSQL normalizado <strong>agrega na leitura</strong>: cerca de 245 mil entradas de índice (index-only scan), custo proporcional aos eventos.</li>
+        <li>Cassandra <strong>modela a consulta</strong>: <code>event_counts_by_day</code> pré-agrega na escrita com contadores. A leitura toca 7 partições pequenas, custo proporcional aos dias.</li>
+        <li>Escrita barata (LSM, sem lock de linha) torna a desnormalização viável.</li>
+        <li>Nenhum índice removido; SQL otimizada (date_bin, a mais rápida de 3).</li>
+        <li><strong>Não</strong> é velocidade bruta do motor: compara trabalho diferente (≈ 2,5 mil células × ≈ 245 mil linhas). Ver E5.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>Demonstrado ao vivo no dashboard: "Comparação ao vivo · Painel agregado"</span><span>11</span></div>
+</section>
+
+<!-- 12 -->
+<section class="slide">
+  <div class="eyebrow">Honestidade experimental (E5 e E6)</div>
+  <h2>Onde a vantagem tem limites</h2>
+  <div class="cols">
+    <div class="card">
+      <h3>E5 · e se o PostgreSQL pré-agregasse?</h3>
+      <table>
+        <tr><td>View materializada, leitura 7 dias</td><td class="num"><strong>1,15 ms</strong></td></tr>
+        <tr><td>REFRESH completo (1 M)</td><td class="num">282 ms</td></tr>
+        <tr><td>Rollup Cassandra (banco)</td><td class="num">1,79 ms</td></tr>
+      </table>
+      <p style="margin-top:10px">Pré-agregado, o PostgreSQL lê na mesma ordem de grandeza (fronteiras diferentes: psql × driver), mas o dado fica desatualizado até o próximo REFRESH, cujo custo cresce com a tabela. No Cassandra o rollup é incremental, mas os contadores não são idempotentes, o que exige reconciliação.</p>
+    </div>
+    <div class="card">
+      <h3>E6 · escritas CRUD, 8 clientes (pool PG 16)</h3>
+      <table>
+        <tr><th>CREATE / UPDATE (mediana)</th><th>PG</th><th>CS</th></tr>
+        <tr><td>Padrão: fsync por commit × commitlog 10 s</td><td class="num">13,2 / 12,1 ms</td><td class="num"><strong>10,8 / 5,8 ms</strong></td></tr>
+        <tr><td>Ambos confirmam antes do fsync</td><td class="num"><strong>5,8 / 4,8 ms</strong></td><td class="num">9,5 / 5,1 ms</td></tr>
+      </table>
+      <p style="margin-top:10px">A vantagem de escrita do Cassandra é explicada pela <strong>política de durabilidade</strong>, não pelo modelo (janela de perda: PG ≈ 0,6 s × CS ≈ 10 s). O CREATE Cassandra paga 2 LWT (Paxos) + batch + contador do rollup.</p>
+    </div>
+  </div>
+  <div class="foot"><span>runs …053008Z-main, …202129Z-writes e …202202Z-durability</span><span>12</span></div>
+</section>
+
+<!-- 13 -->
+<section class="slide">
+  <div class="eyebrow">Investigação de desempenho</div>
+  <h2>N+1 no Cassandra: medido, otimizado, sem mudar o resultado</h2>
+  <p style="font-size:16px">Leituras canônicas sequenciais → concorrência limitada (32) com ordem preservada. Mediana HTTP do Cassandra (ms):</p>
+  <div class="bars" style="margin-top:14px">
+    <div class="row"><span class="label">Q1 página 100</span><div class="pair"><div class="bar" style="width:91%;background:#5a6670"><span>39,3 antes</span></div><div class="bar cs" style="width:17%"><span>7,33 depois</span></div></div><span class="ratio">5,4×</span></div>
+    <div class="row"><span class="label">Q1 10 páginas</span><div class="pair"><div class="bar" style="width:100%;background:#5a6670"><span>417</span></div><div class="bar cs" style="width:21%"><span>85,6</span></div></div><span class="ratio">4,9×</span></div>
+    <div class="row"><span class="label">Q2 IP</span><div class="pair"><div class="bar" style="width:98%;background:#5a6670"><span>42,1</span></div><div class="bar cs" style="width:23%"><span>9,91</span></div></div><span class="ratio">4,2×</span></div>
+    <div class="row"><span class="label">Q3 alertas</span><div class="pair"><div class="bar" style="width:100%;background:#5a6670"><span>43,0</span></div><div class="bar cs" style="width:17%"><span>7,26</span></div></div><span class="ratio">5,9×</span></div>
+  </div>
+  <p style="margin-top:18px;font-size:16.5px">O ganho é grande, mas <strong>não inverte</strong> E1–E3. O próximo passo seria desnormalizar o conteúdo nas projeções, ao custo de escrever 3–4 linhas por UPDATE.</p>
+  <div class="foot"><span>Barras: Q1 10 páginas em escala própria · run …052908Z-n1 × …053008Z-main</span><span>13</span></div>
+</section>
+
+<!-- 14 -->
+<section class="slide">
+  <div class="eyebrow">Demonstração ao vivo</div>
+  <h2>Dashboard SOC: consultas reais nos dois bancos</h2>
+  <div class="cols">
+    <ol style="padding-left:24px">
+      <li><p>Visão geral: semana 26/10–01/11 no <strong>Cassandra</strong>; indicadores, série horária (pico de campanha em 27/10 às 09h), severidade e categorias</p></li>
+      <li><p>Alternar para o <strong>PostgreSQL</strong>: mesmos números, tempo maior</p></li>
+      <li><p>Filtros: categoria Alerta, severidade 5, dia de pico</p></li>
+      <li><p><strong>Comparação ao vivo · Painel agregado</strong>: o ganho do NoSQL, com resultado idêntico</p></li>
+      <li><p>Comparação Q1: o PostgreSQL vence (honestidade)</p></li>
+      <li><p>Investigação Q2: IP de campanha <code>2001:db8:bad:4::6</code>, com paginação</p></li>
+      <li><p>Aba Benchmarks: medianas, N+1, E5, E6</p></li>
+    </ol>
+    <div class="card">
+      <h3>Estados tratados</h3>
+      <p>Carregando · vazio · filtro inválido · banco indisponível · API inacessível. Todos foram testados parando a API e cada banco, sem dados de substituição.</p>
+      <h3 style="margin-top:14px">Se algo falhar</h3>
+      <p>Aba Benchmarks (resultados medidos) + <code>python scripts/validation/check_api.py</code></p>
+    </div>
+  </div>
+  <div class="foot"><span>docs/apresentacao/roteiro-demo.md</span><span>14</span></div>
+</section>
+
+<!-- 15 -->
+<section class="slide">
+  <div class="eyebrow">Conclusões</div>
+  <h2>Cada paradigma vence na pergunta para a qual foi modelado</h2>
+  <div class="cols">
+    <div>
+      <ul>
+        <li><strong>Cassandra</strong>: painel agregado de 7× a 22× mais rápido com modelagem orientada a consultas e pré-agregação na escrita (atualizado a cada escrita, sem REFRESH); escritas mais rápidas na durabilidade padrão; escala horizontal (teórica aqui).</li>
+        <li><strong>PostgreSQL</strong>: buscas por chave de 1,2× a 4× mais rápidas; escritas mais rápidas quando os dois confirmam antes do fsync; consistência e integridade declarativas; consultas ad hoc. Com view materializada, lê o painel na mesma ordem de grandeza.</li>
+        <li>Trade-off central: o Cassandra troca <strong>flexibilidade de consulta e garantias</strong> por <strong>previsibilidade e escala</strong>.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Limitações</h3>
+      <ul>
+        <li>1 nó Cassandra: sem prova de escala ou de tolerância a falhas</li>
+        <li>1 M de eventos sintéticos (5 M não tentado por falta de RAM)</li>
+        <li>Somente cache quente; recursos compartilhados e assimétricos</li>
+        <li>Contadores não idempotentes: reconciliação necessária</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>Repositório: README · docs/ · benchmarks/results · data/bulk/reports</span><span>15</span></div>
+</section>
+
+</div>
+<div id="counter" aria-live="polite"></div>
+<script>
+  const slides = [...document.querySelectorAll('.slide')]
+  const deck = document.getElementById('deck')
+  const counter = document.getElementById('counter')
+  let index = Math.max(0, Math.min(slides.length - 1, (parseInt(location.hash.slice(1), 10) || 1) - 1))
+  function fit() {
+    const s = Math.min(innerWidth / 1280, innerHeight / 720)
+    deck.style.transform = `scale(${s}) translate(-50%, -50%)`
+  }
+  function show(i) {
+    index = Math.max(0, Math.min(slides.length - 1, i))
+    slides.forEach((el, k) => el.classList.toggle('on', k === index))
+    counter.textContent = `${index + 1} / ${slides.length}`
+    history.replaceState(null, '', `#${index + 1}`)
+  }
+  addEventListener('keydown', (e) => {
+    if (['ArrowRight', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); show(index + 1) }
+    if (['ArrowLeft', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); show(index - 1) }
+    if (e.key === 'Home') show(0)
+    if (e.key === 'End') show(slides.length - 1)
+  })
+  addEventListener('click', (e) => { if (e.clientX > innerWidth * 0.5) show(index + 1); else show(index - 1) })
+  addEventListener('resize', fit)
+  addEventListener('hashchange', () => show((parseInt(location.hash.slice(1), 10) || 1) - 1))
+  fit(); show(index)
+</script>
+</body>
+</html>

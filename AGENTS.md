@@ -14,6 +14,7 @@ Projeto acadêmico UNIFOR V3: comparar eventos de cibersegurança equivalentes e
 - Python deve trabalhar em streaming, com seed e manifesto explícitos na futura geração. Não gerar milhões de registros automaticamente.
 - Task 02: ler também `docs/data-model.md`, `docs/query-patterns.md` e `docs/consistency.md`. UUID v4, timestamps UTC em milissegundos, campos de roteamento imutáveis e PUT com revisão esperada. Consultas tocam no máximo sete datas e páginas de até 100 eventos.
 - Cassandra tem registro canônico por ID e projeções de chaves, sem `ALLOW FILTERING`. Respeitar estados pending/active/deleting/deleted e recuperação por ID; logged batch não equivale a transação SQL. Não reutilizar IDs excluídos.
+- Task 04: o rollup `event_counts_by_day` só muda na transição LWT vencedora; após falhas ou injeções de estado, conferir com `python scripts/loading/reconcile_rollup.py` (simulação) e corrigir com `--apply` com a API ociosa. Benchmarks só via `benchmarks/run_benchmarks.py` com API release (`scripts/run_api.py`); resultados anteriores em `benchmarks/results/` são evidência e não devem ser apagados.
 
 ## Preservação e verdade dos dados
 
@@ -35,7 +36,7 @@ Projeto acadêmico UNIFOR V3: comparar eventos de cibersegurança equivalentes e
 
 - Rodar checks proporcionais: `cargo fmt --manifest-path backend/Cargo.toml --check`, `cargo test --manifest-path backend/Cargo.toml`, `cargo build --manifest-path backend/Cargo.toml`, `npm.cmd --prefix frontend run build`.
 - Validar Compose com `docker compose config --quiet`, sem expor credenciais. Com daemon disponível, verificar ambos os healthchecks e endpoints reais.
-- Rodar `python scripts/validation/check_foundation.py` e, com serviços ativos, `python scripts/validation/check_api.py`.
+- Rodar `python scripts/validation/check_foundation.py` e, com serviços ativos, `python scripts/validation/check_api.py`. Sem Rust no Windows, usar `python scripts/run_api.py build|start|stop` (contêiner `rust:1.99.1-slim-bookworm`).
 - Conferir frontend no navegador, estados de falha e responsividade quando houver preview disponível.
 - Informar exatamente o que foi executado, o que falhou e o que ficou bloqueado. Não tratar revisão estática como compilação ou teste aprovado.
 - Usar `npm.cmd` no PowerShell quando `.ps1` estiver bloqueado. Não mudar ExecutionPolicy global.

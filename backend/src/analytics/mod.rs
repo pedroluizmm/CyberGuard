@@ -182,6 +182,195 @@ impl EventQuery {
     }
 }
 
+pub const CATEGORIES: [&str; 3] = ["authentication", "network", "alert"];
+const HOUR_MS: i64 = 3_600_000;
+
+/// Dashboard aggregate over whole UTC hours: `[from,to)`, at most 7 UTC dates.
+/// Optional exact filters by category and severity. Both sources return the
+/// same `Overview`, built from (hour, category, severity, count) cells.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OverviewParams {
+    pub from: String,
+    pub to: String,
+    pub category: Option<String>,
+    pub severity: Option<i16>,
+}
+
+#[derive(Clone, Debug)]
+pub struct OverviewQuery {
+    pub from: DateTime<Utc>,
+    pub to: DateTime<Utc>,
+    pub category: Option<String>,
+    pub severity: Option<i16>,
+}
+
+/// One aggregated cell read from storage.
+pub struct Cell {
+    pub hour: DateTime<Utc>,
+    pub category: String,
+    pub severity: i16,
+    pub count: i64,
+}
+
+#[derive(Serialize)]
+pub struct OverviewFilters {
+    category: Option<String>,
+    severity: Option<i16>,
+}
+
+#[derive(Serialize)]
+pub struct Point {
+    t: String,
+    total: i64,
+    /// Order: authentication, network, alert.
+    by_category: [i64; 3],
+    /// Order: severity 1..5.
+    by_severity: [i64; 5],
+}
+
+#[derive(Serialize)]
+pub struct Overview {
+    from: String,
+    to: String,
+    bucket: &'static str,
+    filters: OverviewFilters,
+    total: i64,
+    alerts: i64,
+    by_category: [i64; 3],
+    by_severity: [i64; 5],
+    series: Vec<Point>,
+}
+
+impl OverviewQuery {
+    pub fn parse(params: OverviewParams) -> Result<Self> {
+        let from = domain::parse_time(&params.from)?;
+        let to = domain::parse_time(&params.to)?;
+        if from.timestamp_millis() % HOUR_MS != 0 || to.timestamp_millis() % HOUR_MS != 0 {
+            return Err(Error::Invalid("overview from/to must be whole UTC hours"));
+        }
+        if from >= to
+            || (to - Duration::milliseconds(1))
+                .date_naive()
+                .signed_duration_since(from.date_naive())
+                .num_days()
+                >= 7
+        {
+            return Err(Error::Invalid(
+                "window must be nonempty and touch at most 7 UTC dates; interval is [from,to)",
+            ));
+        }
+        if let Some(category) = &params.category {
+            if !CATEGORIES.contains(&category.as_str()) {
+                return Err(Error::Invalid(
+                    "category must be authentication, network or alert",
+                ));
+            }
+        }
+        if let Some(severity) = params.severity {
+            domain::validate_severity(severity)?;
+        }
+        Ok(Self {
+            from,
+            to,
+            category: params.category,
+            severity: params.severity,
+        })
+    }
+
+    /// Ascending UTC dates with the hour range `[lo,hi)` touched on each date.
+    pub fn days(&self) -> Vec<(NaiveDate, i8, i8)> {
+        let first = self.from.date_naive();
+        let last = (self.to - Duration::milliseconds(1)).date_naive();
+        let mut result = Vec::new();
+        let mut day = first;
+        while day <= last {
+            let lo = if day == first {
+                self.from.hour_of_day()
+            } else {
+                0
+            };
+            let hi = if day == self.to.date_naive() {
+                self.to.hour_of_day()
+            } else {
+                24
+            };
+            result.push((day, lo, hi));
+            day += Duration::days(1);
+        }
+        result
+    }
+
+    pub fn accepts(&self, category: &str, severity: i16) -> bool {
+        self.category.as_deref().is_none_or(|c| c == category)
+            && self.severity.is_none_or(|s| s == severity)
+    }
+
+    pub fn build(&self, cells: Vec<Cell>) -> Result<Overview> {
+        let hours = ((self.to - self.from).num_milliseconds() / HOUR_MS) as usize;
+        let mut series: Vec<Point> = (0..hours)
+            .map(|i| Point {
+                t: (self.from + Duration::hours(i as i64))
+                    .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                total: 0,
+                by_category: [0; 3],
+                by_severity: [0; 5],
+            })
+            .collect();
+        let (mut by_category, mut by_severity) = ([0i64; 3], [0i64; 5]);
+        for cell in cells {
+            if cell.count == 0 || !self.accepts(&cell.category, cell.severity) {
+                continue;
+            }
+            if cell.hour < self.from || cell.hour >= self.to {
+                continue;
+            }
+            let c = CATEGORIES
+                .iter()
+                .position(|known| *known == cell.category)
+                .ok_or(Error::Corrupt)?;
+            if !(1..=5).contains(&cell.severity) {
+                return Err(Error::Corrupt);
+            }
+            let s = (cell.severity - 1) as usize;
+            let point =
+                &mut series[((cell.hour - self.from).num_milliseconds() / HOUR_MS) as usize];
+            point.total += cell.count;
+            point.by_category[c] += cell.count;
+            point.by_severity[s] += cell.count;
+            by_category[c] += cell.count;
+            by_severity[s] += cell.count;
+        }
+        Ok(Overview {
+            from: self
+                .from
+                .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+            to: self.to.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+            bucket: "hour",
+            filters: OverviewFilters {
+                category: self.category.clone(),
+                severity: self.severity,
+            },
+            total: by_category.iter().sum(),
+            alerts: by_category[2],
+            by_category,
+            by_severity,
+            series,
+        })
+    }
+}
+
+trait HourOfDay {
+    fn hour_of_day(&self) -> i8;
+}
+
+impl HourOfDay for DateTime<Utc> {
+    fn hour_of_day(&self) -> i8 {
+        use chrono::Timelike;
+        self.hour() as i8
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,5 +405,92 @@ mod tests {
         let mut p = params();
         p.cursor = Some("bad".into());
         assert!(EventQuery::parse("device", p).is_err());
+    }
+
+    fn overview(from: &str, to: &str) -> OverviewParams {
+        OverviewParams {
+            from: from.into(),
+            to: to.into(),
+            category: None,
+            severity: None,
+        }
+    }
+
+    #[test]
+    fn overview_requires_whole_hours_seven_dates_and_known_filters() {
+        assert!(
+            OverviewQuery::parse(overview("2026-10-05T00:00:00Z", "2026-10-12T00:00:00Z")).is_ok()
+        );
+        assert!(
+            OverviewQuery::parse(overview("2026-10-05T00:00:00Z", "2026-10-12T01:00:00Z")).is_err()
+        );
+        assert!(
+            OverviewQuery::parse(overview("2026-10-05T00:30:00Z", "2026-10-06T00:00:00Z")).is_err()
+        );
+        assert!(
+            OverviewQuery::parse(overview("2026-10-06T00:00:00Z", "2026-10-06T00:00:00Z")).is_err()
+        );
+        let mut p = overview("2026-10-05T00:00:00Z", "2026-10-06T00:00:00Z");
+        p.category = Some("malware".into());
+        assert!(OverviewQuery::parse(p).is_err());
+        let mut p = overview("2026-10-05T00:00:00Z", "2026-10-06T00:00:00Z");
+        p.severity = Some(6);
+        assert!(OverviewQuery::parse(p).is_err());
+    }
+
+    #[test]
+    fn overview_days_cover_partial_hours_and_build_fills_every_hour() {
+        let q =
+            OverviewQuery::parse(overview("2026-10-05T22:00:00Z", "2026-10-07T03:00:00Z")).unwrap();
+        let days: Vec<_> = q
+            .days()
+            .into_iter()
+            .map(|(d, lo, hi)| (d.to_string(), lo, hi))
+            .collect();
+        assert_eq!(
+            days,
+            vec![
+                ("2026-10-05".to_string(), 22, 24),
+                ("2026-10-06".to_string(), 0, 24),
+                ("2026-10-07".to_string(), 0, 3)
+            ]
+        );
+        let hour = |h: &str| DateTime::parse_from_rfc3339(h).unwrap().with_timezone(&Utc);
+        let cells = vec![
+            Cell {
+                hour: hour("2026-10-05T22:00:00Z"),
+                category: "alert".into(),
+                severity: 5,
+                count: 2,
+            },
+            Cell {
+                hour: hour("2026-10-06T10:00:00Z"),
+                category: "network".into(),
+                severity: 1,
+                count: 7,
+            },
+            // Outside the window: ignored.
+            Cell {
+                hour: hour("2026-10-07T03:00:00Z"),
+                category: "network".into(),
+                severity: 1,
+                count: 9,
+            },
+        ];
+        let o = q.build(cells).unwrap();
+        assert_eq!(o.series.len(), 29);
+        assert_eq!((o.total, o.alerts), (9, 2));
+        assert_eq!(o.by_category, [0, 7, 2]);
+        assert_eq!(o.by_severity, [7, 0, 0, 0, 2]);
+        assert_eq!(o.series[0].by_category, [0, 0, 2]);
+        let mut filtered = q.clone();
+        filtered.category = Some("alert".into());
+        let cells = vec![Cell {
+            hour: hour("2026-10-06T10:00:00Z"),
+            category: "network".into(),
+            severity: 1,
+            count: 7,
+        }];
+        assert_eq!(filtered.build(cells).unwrap().total, 0);
     }
 }

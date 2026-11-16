@@ -1,5 +1,5 @@
 use crate::{
-    analytics::EventQuery,
+    analytics::{Cell, EventQuery, OverviewQuery},
     config::Config,
     domain::{Event, UpdateEvent},
     error::{Error, Result},
@@ -34,12 +34,13 @@ pub struct Repositories {
 
 impl Repositories {
     pub fn new(config: Config) -> Self {
-        let options = config
-            .postgres
-            .clone()
-            .options([("statement_timeout", "15000"), ("lock_timeout", "5000")]);
+        let options = config.postgres.clone().options([
+            ("statement_timeout", "15000"),
+            ("lock_timeout", "5000"),
+            ("synchronous_commit", config.postgres_synchronous_commit),
+        ]);
         let pool = PgPoolOptions::new()
-            .max_connections(5)
+            .max_connections(config.postgres_pool_size)
             .acquire_timeout(config.storage_timeout)
             .connect_lazy_with(options);
         Self {
@@ -99,6 +100,12 @@ impl Repositories {
         match source {
             Source::Postgresql => self.postgres.query(q).await,
             Source::Cassandra => self.cql().await?.query(q).await,
+        }
+    }
+    pub async fn overview(&self, source: Source, q: &OverviewQuery) -> Result<Vec<Cell>> {
+        match source {
+            Source::Postgresql => self.postgres.overview(q).await,
+            Source::Cassandra => self.cql().await?.overview(q).await,
         }
     }
     pub async fn repair(&self, source: Source, id: Uuid) -> Result<&'static str> {

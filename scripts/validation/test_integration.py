@@ -220,6 +220,67 @@ class CrudIntegration(unittest.TestCase):
             path=f"/api/{source}/events/{self.sample[0]['event_id']}/repair"
             self.assertEqual(request("POST",path),(200,{"state":"active"}))
 
+    def overview(self, source, **extra):
+        params = {"from": "2001-11-06T00:00:00Z", "to": "2001-11-09T00:00:00Z", **extra}
+        status, body = request("GET", f"/api/{source}/stats/overview?" + urllib.parse.urlencode(params))
+        self.assertEqual(status, 200, body)
+        return body
+
+    def test_08_overview_equivalent_and_rollup_follows_crud(self):
+        # Same logical state in both sources -> byte-identical aggregate.
+        for extra in ({}, {"category": "alert"}, {"severity": 4}, {"category": "alert", "severity": 5}):
+            with self.subTest(filters=extra):
+                self.assertEqual(self.overview("postgresql", **extra), self.overview("cassandra", **extra))
+        event = copy.deepcopy(self.sample[6]); event["event_id"] = str(uuid.uuid4())
+        hour = (int(event["occurred_at"][8:10]) - 6) * 24 + int(event["occurred_at"][11:13])
+        category = ["authentication", "network", "alert"].index(event["category"])
+        for source in SOURCES:
+            before = self.overview(source)
+            self.created.append((source, event["event_id"]))
+            self.assertEqual(request("POST", f"/api/{source}/events", event)[0], 201)
+            self.assertEqual(request("POST", f"/api/{source}/events", event)[0], 200)  # retry: no double count
+            during = self.overview(source)
+            self.assertEqual(during["total"], before["total"] + 1)
+            self.assertEqual(during["series"][hour]["by_category"][category],
+                             before["series"][hour]["by_category"][category] + 1)
+            self.assertEqual(during["by_severity"][event["severity"] - 1],
+                             before["by_severity"][event["severity"] - 1] + 1)
+            path = f"/api/{source}/events/{event['event_id']}"
+            self.assertEqual(request("DELETE", path + "?expected_revision=1")[0], 204)
+            self.assertEqual(request("DELETE", path + "?expected_revision=1")[0], 204)  # retry: no double decrement
+            self.assertEqual(self.overview(source), before)
+
+    def test_09_overview_rejects_invalid_windows_and_filters(self):
+        for source in SOURCES:
+            for changes in [{"from": "2001-11-06T00:30:00Z"}, {"to": "2001-11-14T00:00:00Z"},
+                            {"to": "2001-11-06T00:00:00Z"}, {"category": "malware"}, {"severity": 9},
+                            {"device_id": "x"}]:
+                params = {"from": "2001-11-06T00:00:00Z", "to": "2001-11-09T00:00:00Z", **changes}
+                with self.subTest(source=source, changes=changes):
+                    self.assertEqual(request("GET", f"/api/{source}/stats/overview?" + urllib.parse.urlencode(params))[0], 400)
+
+    def test_10_instrumentation_used_by_dashboard_and_benchmarks(self):
+        # Server-Timing is the "tempo no banco" shown in the UI and recorded as db_ms.
+        paths = [f"/api/{{s}}/events/{self.sample[1]['event_id']}",
+                 "/api/{s}/queries/device?" + urllib.parse.urlencode(self.query_case("device", self.sample[1]["device_id"])),
+                 "/api/{s}/stats/overview?from=2001-11-06T00:00:00Z&to=2001-11-07T00:00:00Z"]
+        for source in SOURCES:
+            for path in paths:
+                with urllib.request.urlopen(BASE + path.format(s=source), timeout=35) as response:
+                    timing = response.headers.get("Server-Timing", "")
+                    self.assertRegex(timing, r"^db;dur=\d+\.\d{3}$", path)
+        status, runtime = request("GET", "/api/runtime")
+        self.assertEqual(status, 200)
+        self.assertIn(runtime["build"], ("debug", "release"))
+        self.assertTrue(1 <= runtime["cassandra_read_concurrency"] <= 128)
+        self.assertIn(runtime["postgres_synchronous_commit"], ("on", "off"))
+        self.assertTrue(1 <= runtime["postgres_pool_size"] <= 64)
+        status, summary = request("GET", "/api/benchmarks/summary")
+        self.assertIn(status, (200, 404))  # 404 = no measurement yet, never a placeholder
+        if status == 200:
+            self.assertTrue(summary["main"]["complete"])
+            self.assertTrue(all(op["equivalent"] for op in summary["main"]["operations"]))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

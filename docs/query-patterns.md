@@ -103,7 +103,7 @@ SELECT payload, revision, lifecycle FROM cyberguard.events_by_id WHERE event_id 
 
 Cada `?` recebe um valor serializado pelo driver e as instruções são preparadas/cacheadas. As duas primeiras igualdades identificam a chave completa de partição. O par de clustering `(timestamp,UUID)` permite intervalos e continuação ordenada; a ordem DESC está declarada no esquema. O limite inferior é `(from,UUID nulo)` e o superior é `(to,UUID nulo)` ou a posição exclusiva do cursor. UUID nulo é apenas sentinela interna, nunca um ID de evento aceito.
 
-O backend percorre as datas do fim para o início, no máximo sete. Busca somente o número de candidatos ainda necessário, valida o registro canônico e o filtro e concatena os resultados nessa ordem. A leitura canônica evita retornar conteúdo desatualizado de projeções. Projeções antigas de registros excluídos/pendentes não aparecem como eventos ativos. Se precisar ultrapassar 1000 candidatos examinados numa página, retorna 503 `scan_limit`, em vez de varrer indefinidamente ou apresentar um resultado incompleto como completo. As consultas seguem as restrições de chave/intervalo do [CQL](https://cassandra.apache.org/doc/latest/cassandra/developing/cql/dml.html).
+O backend percorre as datas do fim para o início, no máximo sete. Busca somente o número de candidatos ainda necessário, valida o registro canônico e o filtro e concatena os resultados nessa ordem. As leituras canônicas de cada fatia rodam com concorrência limitada (`CASSANDRA_READ_CONCURRENCY`, padrão 32, via `buffered`, que preserva a ordem). Antes da Task 04 eram sequenciais (N+1), comportamento que ainda pode ser reproduzido com o valor 1. O ganho medido foi de 2,4× a 5,9× por página, com resultados idênticos ([benchmark-methodology.md](benchmark-methodology.md)). A leitura canônica evita retornar conteúdo desatualizado de projeções. Projeções antigas de registros excluídos/pendentes não aparecem como eventos ativos. Se precisar ultrapassar 1000 candidatos examinados numa página, retorna 503 `scan_limit`, em vez de varrer indefinidamente ou apresentar um resultado incompleto como completo. As consultas seguem as restrições de chave/intervalo do [CQL](https://cassandra.apache.org/doc/latest/cassandra/developing/cql/dml.html).
 
 ### Exemplos CQL executáveis, dia 06/11
 
@@ -129,6 +129,36 @@ LIMIT 20;
 
 Para uma janela de três dias, a API consulta 08/11, 07/11 e 06/11 e lê os IDs canônicos necessários. Executar somente a instrução de um dia manualmente não equivale à janela inteira SQL. Os exemplos de projeção mostram chaves, não o payload completo; a API entrega o mesmo envelope de evento nos dois bancos.
 
+## Painel agregado (Task 04)
+
+Rota: `GET /api/{source}/stats/overview?from=&to=[&category=][&severity=]`. `from` e `to` são horas inteiras UTC, o intervalo é `[from,to)` e a janela toca no máximo sete datas. `category` aceita `authentication`, `network` ou `alert`; `severity` aceita de 1 a 5 (igualdade). A resposta traz `total`, `alerts`, `by_category` (na ordem autenticação, rede, alerta), `by_severity` (de 1 a 5) e `series`, com uma entrada por hora, inclusive as vazias. Com o mesmo estado lógico, o JSON é idêntico nas duas fontes.
+
+```sql
+-- PostgreSQL: agregação na leitura com index-only scan em events_time_cover_idx
+SELECT date_bin('1 hour', occurred_at, TIMESTAMPTZ '2000-01-01 00:00:00+00') AS hour,
+       category, severity, count(*) AS n
+FROM events
+WHERE occurred_at >= $1 AND occurred_at < $2
+  [AND category = $3] [AND severity = $4]   -- fragmentos fixos escolhidos pela API
+GROUP BY 1, 2, 3;
+```
+
+```cql
+-- Cassandra: até 7 leituras de partição concorrentes (uma por data UTC)
+SELECT hour, category, severity, events
+FROM cyberguard.event_counts_by_day
+WHERE event_date = ? AND hour >= ? AND hour < ?;
+-- Categoria/severidade são filtradas na aplicação: a partição tem no máximo 24 x 15 células.
+
+-- Manutenção, somente pela requisição que venceu a transição LWT
+UPDATE cyberguard.event_counts_by_day SET events = events + 1   -- pending -> active
+WHERE event_date = ? AND hour = ? AND category = ? AND severity = ?;
+UPDATE cyberguard.event_counts_by_day SET events = events - 1   -- deleting -> deleted
+WHERE event_date = ? AND hour = ? AND category = ? AND severity = ?;
+```
+
+O custo no PostgreSQL cresce com o número de eventos do período, cerca de 245 mil entradas de índice em 7 dias. No Cassandra, cresce só com o número de dias. Entre as expressões de agrupamento medidas, `date_bin` foi a mais rápida. A semântica do contador (não idempotente, reconciliação) está em [consistency.md](consistency.md#rollup-do-painel).
+
 ## Exemplos HTTP
 
 ```text
@@ -137,4 +167,9 @@ GET /api/cassandra/queries/ip?source_ip=192.0.2.10&from=2026-11-06T00:00:00Z&to=
 GET /api/cassandra/queries/alerts?severity=4&from=2026-11-06T00:00:00Z&to=2026-11-09T00:00:00Z&page_size=2
 ```
 
-Adicionar `cursor=<next_cursor>` preservando todos os outros parâmetros para continuar. Janela sem resultados retorna 200 com `items=[]` e `next_cursor=null`. Parâmetros inválidos retornam 400. Nenhuma duração desta etapa comprova vantagem de um banco; canonical lookups, LWTs, transações, índices e limites precisam compor o futuro protocolo experimental.
+Para continuar, adicione `cursor=<next_cursor>` mantendo todos os outros parâmetros. Uma janela sem resultados retorna 200 com `items=[]` e `next_cursor=null`, e parâmetros inválidos retornam 400. READ, Q1–Q3 e o painel devolvem `Server-Timing: db;dur=<ms>`, o tempo do adaptador de armazenamento. As medições comparativas estão em [benchmark-methodology.md](benchmark-methodology.md).
+
+```text
+GET /api/cassandra/stats/overview?from=2026-10-26T00:00:00Z&to=2026-11-02T00:00:00Z
+GET /api/postgresql/stats/overview?from=2026-10-27T00:00:00Z&to=2026-10-28T00:00:00Z&category=alert&severity=5
+```

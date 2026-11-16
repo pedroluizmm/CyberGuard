@@ -8,6 +8,7 @@ use axum::{
     Json, Router,
     extract::State,
     http::{HeaderValue, Method, StatusCode, header},
+    response::{IntoResponse, Response},
     routing::get,
 };
 use serde::Serialize;
@@ -24,6 +25,22 @@ pub struct Health {
     status: &'static str,
     service: &'static str,
     version: &'static str,
+    /// Compilation profile; benchmarks must record it (debug is not comparable).
+    build: &'static str,
+}
+
+const BUILD: &str = if cfg!(debug_assertions) {
+    "debug"
+} else {
+    "release"
+};
+
+#[derive(Serialize)]
+struct Runtime {
+    build: &'static str,
+    cassandra_read_concurrency: usize,
+    postgres_synchronous_commit: &'static str,
+    postgres_pool_size: u32,
 }
 
 #[derive(Serialize)]
@@ -37,7 +54,8 @@ pub fn router(config: Config) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(config.frontend_origin.clone())
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
-        .allow_headers([header::ACCEPT, header::CONTENT_TYPE]);
+        .allow_headers([header::ACCEPT, header::CONTENT_TYPE])
+        .expose_headers([header::HeaderName::from_static("server-timing")]);
     let state = Arc::new(AppState {
         repositories: Repositories::new(config.clone()),
         config,
@@ -45,6 +63,9 @@ pub fn router(config: Config) -> Router {
     Router::new()
         .route("/api/health", get(health))
         .route("/api/health/storage", get(storage_health))
+        .route("/api/runtime", get(runtime))
+        .route("/api/benchmarks/summary", get(benchmark_summary))
+        .route("/api/{source}/stats/overview", get(events::overview))
         .route("/api/{source}/events", axum::routing::post(events::create))
         .route(
             "/api/{source}/events/{id}",
@@ -76,8 +97,61 @@ async fn health() -> ([(header::HeaderName, HeaderValue); 1], Json<Health>) {
             status: "ok",
             service: "cyberguard-api",
             version: env!("CARGO_PKG_VERSION"),
+            build: BUILD,
         }),
     )
+}
+
+async fn runtime(State(state): State<Arc<AppState>>) -> Json<Runtime> {
+    Json(Runtime {
+        build: BUILD,
+        cassandra_read_concurrency: state.config.cassandra_read_concurrency,
+        postgres_synchronous_commit: state.config.postgres_synchronous_commit,
+        postgres_pool_size: state.config.postgres_pool_size,
+    })
+}
+
+/// Serves the summary written by `benchmarks/run_benchmarks.py`. The file holds
+/// measured results only; absence is reported as 404, never replaced by mocks.
+async fn benchmark_summary(State(state): State<Arc<AppState>>) -> Response {
+    let configured = &state.config.benchmark_summary;
+    let mut candidates = vec![configured.clone()];
+    if configured.is_relative() {
+        // `cargo run` from backend/ resolves the repository root as the parent.
+        candidates.push(std::path::Path::new("..").join(configured));
+    }
+    for path in candidates {
+        match tokio::fs::read(&path).await {
+            Ok(bytes) if bytes.len() <= 8 * 1024 * 1024 => {
+                return match serde_json::from_slice::<serde_json::Value>(&bytes) {
+                    Ok(value) => Json(value).into_response(),
+                    Err(_) => error(StatusCode::SERVICE_UNAVAILABLE, "benchmark_summary_invalid"),
+                };
+            }
+            Ok(_) => {
+                return error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "benchmark_summary_too_large",
+                );
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(_) => {
+                return error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "benchmark_summary_unreadable",
+                );
+            }
+        }
+    }
+    error(StatusCode::NOT_FOUND, "benchmark_summary_missing")
+}
+
+fn error(status: StatusCode, code: &'static str) -> Response {
+    (
+        status,
+        Json(serde_json::json!({"error": {"code": code, "message": "Run benchmarks/run_benchmarks.py to produce measured results"}})),
+    )
+        .into_response()
 }
 
 async fn storage_health(

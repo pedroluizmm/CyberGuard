@@ -1,6 +1,6 @@
 # Massa volumosa: geração, carga e validação (Task 03)
 
-Este documento descreve **como** a massa é produzida, carregada e conferida. Os resultados efetivamente medidos (tempos, contagens, tamanhos, recursos) estão em [verification-task03.md](verification-task03.md) e nos relatórios JSON de `data/bulk/reports/`.
+Este documento descreve **como** a massa é produzida, carregada e conferida. Os resultados efetivamente medidos (tempos, contagens, tamanhos, recursos) estão em [verification-task03.md](verification/verification-task03.md) e nos relatórios JSON de `data/bulk/reports/`.
 
 ## Registro lógico e linha física
 
@@ -57,7 +57,7 @@ A carga inicial passa pela **API real** (`POST /api/{fonte}/events`). Assim, o P
 
 ### O que o tempo de carga significa
 
-É o tempo de **carga inicial via API** em laboratório: inclui cliente Python, HTTP, validação e serialização na API (build **debug**), além do fluxo completo de cada banco (PostgreSQL ≈ 7 comandos por transação; Cassandra = 2 LWT + 1 logged batch + 2 leituras). As durabilidades são diferentes: PostgreSQL com `synchronous_commit=on` (fsync no commit) e Cassandra com `commitlog_sync: periodic` de 10 s e RF=1. Esses números **não são benchmark** e não demonstram superioridade de nenhum banco. Medições comparativas (≥10 execuções, aquecimento/cache, versões) ficam para a Task 04.
+É o tempo de **carga inicial via API** em laboratório: inclui cliente Python, HTTP, validação e serialização na API (build **debug**), além do fluxo completo de cada banco (PostgreSQL ≈ 7 comandos por transação; Cassandra = 2 LWT + 1 logged batch + 2 leituras). As durabilidades são diferentes: PostgreSQL com `synchronous_commit=on` (fsync no commit) e Cassandra com `commitlog_sync: periodic` de 10 s e RF=1. Esses números **não são benchmark** e não demonstram superioridade de nenhum banco. As medições comparativas controladas (30 execuções, aquecimento, versões e variante com confirmação antes do fsync) estão em [benchmark-methodology.md](benchmark-methodology.md) (E6 para escrita).
 
 ## Validação (`scripts/validation/check_bulk.py --target N`)
 
