@@ -1,27 +1,44 @@
 <script lang="ts">
-  import { onMount, untrack } from 'svelte'
+  import { onMount, tick } from 'svelte'
   import BenchmarkPanel from './lib/BenchmarkPanel.svelte'
-  import CategoryShare from './lib/CategoryShare.svelte'
   import EventExplorer from './lib/EventExplorer.svelte'
+  import Icon, { type IconName } from './lib/Icon.svelte'
   import LiveCompare from './lib/LiveCompare.svelte'
-  import SeverityBars from './lib/SeverityBars.svelte'
-  import TimelineChart from './lib/TimelineChart.svelte'
+  import OverviewView from './lib/OverviewView.svelte'
   import {
-    ApiError, CATEGORIES, CATEGORY_LABEL, describeProbe, getHealth, getOverview, getRuntime, getStorageHealth,
-    SEVERITY_LABEL, SOURCE_KIND, SOURCE_LABEL, SOURCES,
-    type Category, type Health, type Overview, type Runtime, type Source, type StorageHealth,
+    CATEGORIES, CATEGORY_LABEL, describeProbe, getHealth, getRuntime, getStorageHealth,
+    SEVERITY_LABEL, SOURCE_ICON, SOURCE_KIND, SOURCE_LABEL, SOURCES,
+    type Category, type Health, type Runtime, type Source, type StorageHealth,
   } from './lib/api'
-  import { fmtDay, fmtInt, fmtMs, fmtPct } from './lib/format'
 
-  const views = [
-    { id: 'overview', label: 'Visão geral', icon: '◫' },
-    { id: 'investigate', label: 'Investigação', icon: '⌕' },
-    { id: 'benchmarks', label: 'Benchmarks', icon: '▥' },
-  ] as const
-  type View = (typeof views)[number]['id']
-  let view = $state<View>('overview')
+  // ---- navigation (hash-based so reload and the Back button keep the section) ----
+  type View = 'overview' | 'investigate' | 'compare' | 'benchmarks'
+  const views: { id: View; slug: string; label: string; icon: IconName; group: string; subtitle: string }[] = [
+    { id: 'overview', slug: 'visao-geral', label: 'Visão geral', icon: 'grid', group: 'Monitoramento',
+      subtitle: 'Indicadores e evolução dos eventos no período, consultados agora na fonte selecionada.' },
+    { id: 'investigate', slug: 'investigacao', label: 'Investigação', icon: 'search', group: 'Monitoramento',
+      subtitle: 'Linha do tempo por dispositivo, IP de origem ou severidade (Q1–Q3), com paginação por cursor.' },
+    { id: 'compare', slug: 'comparacao', label: 'Comparação', icon: 'compare', group: 'Análise',
+      subtitle: 'A mesma consulta executada agora nos dois bancos: tempos reais e verificação do resultado.' },
+    { id: 'benchmarks', slug: 'benchmarks', label: 'Benchmarks', icon: 'chart', group: 'Análise',
+      subtitle: 'Resultados experimentais medidos (E1–E6), com protocolo, ambiente e ressalvas.' },
+  ]
+  const groups = ['Monitoramento', 'Análise']
+  const viewFromHash = (): View => views.find((v) => v.slug === location.hash.replace(/^#\/?/, ''))?.id ?? 'overview'
+  let view = $state<View>(viewFromHash())
+  const current = $derived(views.find((v) => v.id === view)!)
+  let heading: HTMLHeadingElement | undefined = $state()
 
-  // ---- global filters (scope everything below the filter row) ----
+  async function go(next: View) {
+    const slug = views.find((v) => v.id === next)!.slug
+    if (location.hash.replace(/^#\/?/, '') !== slug) location.hash = slug
+    view = next
+    await tick()
+    heading?.focus({ preventScroll: true })
+    window.scrollTo({ top: 0 })
+  }
+
+  // ---- global filters (scope every query below the toolbar) ----
   let source = $state<Source>('cassandra')
   const presets = [
     { label: '05–11/10', start: '2026-10-05', days: 7 },
@@ -37,8 +54,10 @@
   let severity = $state<number | ''>('')
   const from = $derived(`${start}T00:00:00Z`)
   const to = $derived(new Date(Date.parse(from) + days * 86_400_000).toISOString().replace('.000Z', 'Z'))
+  const showFilters = $derived(view !== 'benchmarks')
+  const showSource = $derived(view === 'overview' || view === 'investigate')
 
-  // ---- health ----
+  // ---- service health (probes are not benchmark measurements) ----
   let health = $state<Health | null>(null)
   let storage = $state<StorageHealth | null>(null)
   let runtime = $state<Runtime | null>(null)
@@ -53,189 +72,233 @@
     apiDown = h.status === 'rejected'
     checking = false
   }
-
-  // ---- overview (real query on the selected source) ----
-  type OverviewState = { status: 'loading' | 'ready' | 'error'; data: Overview | null; timing: { http: number; db: number | null; source: Source } | null; error: ApiError | null }
-  let ov = $state<OverviewState>({ status: 'loading', data: null, timing: null, error: null })
-  let seq = 0
-  async function loadOverview(src: Source, params: { from: string; to: string; category: string | null; severity: number | null }) {
-    const mine = ++seq
-    ov.status = 'loading'
-    try {
-      const r = await getOverview(src, params)
-      if (mine !== seq) return
-      ov = { status: 'ready', data: r.data, timing: { http: r.httpMs, db: r.dbMs, source: src }, error: null }
-    } catch (e) {
-      if (mine !== seq) return
-      ov = { status: 'error', data: null, timing: null, error: e instanceof ApiError ? e : new ApiError('contract', 'unknown', 'Falha inesperada.') }
-    }
-  }
-  $effect(() => {
-    const params = { from, to, category: category || null, severity: severity === '' ? null : severity }
-    const src = source
-    untrack(() => loadOverview(src, params))
-  })
-  onMount(() => { void checkHealth() })
-
-  const data = $derived(ov.data)
-  const visible = $derived<Category[]>(category ? [category] : [...CATEGORIES])
   const sourceProbe = $derived(storage?.[source] ?? null)
-  const perDay = $derived.by(() => {
-    if (!data) return []
-    const map = new Map<string, number[]>()
-    for (const p of data.series) {
-      const key = p.t.slice(0, 10)
-      const row = map.get(key) ?? [0, 0, 0, 0]
-      p.by_category.forEach((v, i) => (row[i] += v))
-      row[3] += p.total
-      map.set(key, row)
-    }
-    return [...map.entries()]
+
+  onMount(() => {
+    const sync = () => { view = viewFromHash() }
+    addEventListener('hashchange', sync)
+    void checkHealth()
+    return () => removeEventListener('hashchange', sync)
   })
-  const peakHour = $derived(data ? data.series.reduce((best, p) => (p.total > best.total ? p : best), data.series[0]) : null)
-  function errorText(e: ApiError | null): string {
-    if (!e) return ''
-    if (e.kind === 'network') return 'A API local não está acessível. Inicie-a com python scripts/run_api.py start.'
-    if (e.kind === 'unavailable' || e.kind === 'timeout') return `${SOURCE_LABEL[source]} indisponível no momento (${e.code}). Nenhum dado é exibido no lugar da consulta.`
-    if (e.kind === 'invalid') return `Filtro rejeitado pela API: ${e.message}`
-    return e.message
-  }
 </script>
 
-<svelte:head><title>{views.find((v) => v.id === view)?.label} · CyberGuard</title></svelte:head>
+<svelte:head><title>{current.label} · CyberGuard</title></svelte:head>
 
-<div class="app">
-  <aside class="sidebar">
+<a class="skip" href="#content">Pular para o conteúdo</a>
+<div class="shell">
+  <aside class="sidebar" aria-label="Navegação principal">
     <div class="brand">
-      <svg width="28" height="32" viewBox="0 0 32 36" fill="none" aria-hidden="true"><path d="M16 3 28 8v9c0 8-12 15-12 15S4 25 4 17V8L16 3Z" stroke="currentColor" stroke-width="1.8"/><path d="m10 17 4 4 8-9" stroke="currentColor" stroke-width="1.8"/></svg>
-      <span>CYBER<b>GUARD</b><small>SOC · Cassandra × PostgreSQL</small></span>
+      <span class="logo"><Icon name="shield" size={20} stroke={1.9} /></span>
+      <span class="name">CyberGuard<small>Cassandra × PostgreSQL</small></span>
     </div>
-    <nav aria-label="Seções">
-      {#each views as v}
-        <button class:active={view === v.id} aria-current={view === v.id ? 'page' : undefined} onclick={() => (view = v.id)}><span aria-hidden="true">{v.icon}</span>{v.label}</button>
+
+    <nav class="nav" aria-label="Seções">
+      {#each groups as group}
+        <p class="eyebrow group">{group}</p>
+        {#each views.filter((v) => v.group === group) as v}
+          <a href={`#${v.slug}`} class:active={view === v.id} aria-current={view === v.id ? 'page' : undefined}
+            onclick={(e) => { e.preventDefault(); void go(v.id) }}>
+            <Icon name={v.icon} size={18} /><span>{v.label}</span>
+          </a>
+        {/each}
       {/each}
     </nav>
-    <div class="health" aria-live="polite">
-      <p class="eyebrow">SERVIÇOS</p>
-      <p class="pill" class:up={!!health} class:down={apiDown}><i></i>API {health ? `v${health.version} · ${health.build ?? ''}` : checking ? 'verificando…' : 'indisponível'}</p>
+
+    <section class="services" aria-live="polite" aria-label="Estado dos serviços">
+      <div class="services-head">
+        <p class="eyebrow">Serviços</p>
+        <button class="btn ghost icon" onclick={checkHealth} disabled={checking} aria-label="Verificar serviços novamente" title="Verificar novamente">
+          {#if checking}<span class="spinner"></span>{:else}<Icon name="refresh" size={15} />{/if}
+        </button>
+      </div>
+      <p class="svc" class:up={!!health} class:down={apiDown}>
+        <i></i><span>API</span><em>{health ? `v${health.version} · ${health.build ?? '—'}` : checking ? 'verificando…' : 'indisponível'}</em>
+      </p>
       {#each SOURCES as s}
         {@const p = storage?.[s]}
-        <p class="pill" class:up={p?.status === 'up'} class:down={p?.status === 'down'} class:unknown={!checking && !p}><i></i>{SOURCE_LABEL[s]} {checking ? 'verificando…' : !p ? 'não verificado' : p.status === 'up' ? 'conectado' : describeProbe(p.error)}</p>
+        <p class="svc" class:up={p?.status === 'up'} class:down={p?.status === 'down'} class:unknown={!checking && !p}>
+          <i></i><span>{SOURCE_LABEL[s]}</span>
+          <em>{checking ? 'verificando…' : !p ? 'não verificado' : p.status === 'up' ? 'conectado' : describeProbe(p.error)}</em>
+        </p>
       {/each}
-      <button class="ghost small" onclick={checkHealth} disabled={checking}>{checking ? 'Verificando…' : 'Verificar novamente'}</button>
+    </section>
+
+    <div class="dataset">
+      <span class="dataset-icon"><Icon name="layers" size={16} /></span>
+      <p><strong>Dados sintéticos</strong>Massa de 05/10 a 01/11/2026 e amostra de 06 a 08/11/2026. Horários em UTC.</p>
     </div>
-    <footer>UNIFOR · Banco de Dados NoSQL · V3 2026<br />Dados sintéticos · horários em UTC</footer>
+    <p class="credit">UNIFOR · Banco de Dados NoSQL<br />Projeto 3 · 2026</p>
   </aside>
 
   <div class="main">
     <header class="topbar">
-      <div>
-        <p class="eyebrow">CENTRAL DE OPERAÇÕES DE SEGURANÇA</p>
-        <h1>{views.find((v) => v.id === view)?.label}</h1>
+      <div class="title">
+        <p class="crumbs"><span>CyberGuard</span><Icon name="right" size={13} /><span>{current.group}</span></p>
+        <h1 tabindex="-1" bind:this={heading}>{current.label}</h1>
+        <p class="subtitle">{current.subtitle}</p>
       </div>
-      <div class="source" role="radiogroup" aria-label="Fonte de dados consultada">
-        {#each SOURCES as s}
-          <button role="radio" aria-checked={source === s} class:on={source === s} onclick={() => (source = s)}>
-            <i class={s}></i><span>{SOURCE_LABEL[s]}<small>{SOURCE_KIND[s]}</small></span>
-          </button>
-        {/each}
-      </div>
-    </header>
-
-    {#if view !== 'benchmarks'}
-      <section class="filters" aria-label="Filtros">
-        <div class="presets" role="group" aria-label="Período (UTC)">
-          {#each presets as p}
-            <button class:on={start === p.start && days === p.days} onclick={() => { start = p.start; days = p.days }}>{p.label}</button>
+      {#if showSource}
+        <div class="source" role="radiogroup" aria-label="Fonte de dados consultada">
+          {#each SOURCES as s}
+            <button role="radio" aria-checked={source === s} class:on={source === s} onclick={() => (source = s)}>
+              <span class="src-icon"><Icon name={SOURCE_ICON[s]} size={17} /></span>
+              <span class="src-text">{SOURCE_LABEL[s]}<small>{SOURCE_KIND[s]}</small></span>
+            </button>
           {/each}
         </div>
-        <label>Início<input type="date" bind:value={start} min="2000-01-01" max="2099-12-25" required /></label>
-        <label>Dias<select bind:value={days}>{#each [1, 2, 3, 4, 5, 6, 7] as d}<option value={d}>{d}</option>{/each}</select></label>
-        {#if view === 'overview'}
-          <label>Categoria<select bind:value={category}><option value="">Todas</option>{#each CATEGORIES as c}<option value={c}>{CATEGORY_LABEL[c]}</option>{/each}</select></label>
-          <label>Severidade<select bind:value={severity}><option value="">Todas</option>{#each [1, 2, 3, 4, 5] as s}<option value={s}>{s} · {SEVERITY_LABEL[s - 1]}</option>{/each}</select></label>
-        {/if}
+      {:else if view === 'compare'}
+        <p class="badge steel"><Icon name="compare" size={14} />Consulta os dois bancos</p>
+      {/if}
+    </header>
+
+    {#if showFilters}
+      <section class="toolbar" aria-label="Filtros da consulta">
+        <div class="presets" role="group" aria-label="Atalhos de período (UTC)">
+          <span class="toolbar-label"><Icon name="calendar" size={15} />Período</span>
+          {#each presets as p}
+            <button class="chip" class:on={start === p.start && days === p.days} aria-pressed={start === p.start && days === p.days}
+              onclick={() => { start = p.start; days = p.days }}>{p.label}</button>
+          {/each}
+        </div>
+        <div class="inputs">
+          <label class="field">Início (UTC)<input type="date" bind:value={start} min="2000-01-01" max="2099-12-25" required /></label>
+          <label class="field">Dias<select bind:value={days}>{#each [1, 2, 3, 4, 5, 6, 7] as d}<option value={d}>{d} {d === 1 ? 'dia' : 'dias'}</option>{/each}</select></label>
+          {#if view !== 'investigate'}
+            <label class="field">Categoria<select bind:value={category}><option value="">Todas</option>{#each CATEGORIES as c}<option value={c}>{CATEGORY_LABEL[c]}</option>{/each}</select></label>
+            <label class="field">Severidade<select bind:value={severity}><option value="">Todas</option>{#each [1, 2, 3, 4, 5] as s}<option value={s}>{s} · {SEVERITY_LABEL[s - 1]}</option>{/each}</select></label>
+          {/if}
+        </div>
       </section>
     {/if}
 
-    <main>
-      <div hidden={view !== 'overview'}>
-        {#if sourceProbe?.status === 'down'}
-          <p class="banner" role="alert">{SOURCE_LABEL[source]} está indisponível ({describeProbe(sourceProbe.error)}). As consultas a esta fonte falharão até que o serviço volte; troque a fonte ou reinicie o contêiner.</p>
-        {/if}
+    <main id="content" class="content">
+      {#if showSource && sourceProbe?.status === 'down'}
+        <p class="banner" role="alert"><Icon name="alert" size={16} /><span><strong>{SOURCE_LABEL[source]} indisponível</strong> ({describeProbe(sourceProbe.error)}). As consultas a esta fonte falharão até o serviço voltar. Troque a fonte ou reinicie o contêiner.</span></p>
+      {/if}
 
-        {#if ov.status === 'error'}
-          <div class="panel state-panel" role="alert"><h2>Consulta não concluída</h2><p>{errorText(ov.error)}</p><button class="ghost" onclick={() => loadOverview(source, { from, to, category: category || null, severity: severity === '' ? null : severity })}>Tentar novamente</button></div>
-        {:else if !data}
-          <div class="panel state-panel" aria-busy="true"><p>Consultando {SOURCE_LABEL[source]}…</p></div>
-        {:else}
-          <div class:stale={ov.status === 'loading'} class="overview">
-            <section class="kpis" aria-label="Indicadores do período">
-              <article class="kpi hero">
-                <span>Eventos no período</span>
-                <strong>{fmtInt(data.total)}</strong>
-                <small>{fmtDay(data.from)}{days > 1 ? ` a ${fmtDay(new Date(Date.parse(data.to) - 1).toISOString())}` : ''} · {days} {days === 1 ? 'dia' : 'dias'}{category ? ` · ${CATEGORY_LABEL[category]}` : ''}{severity !== '' ? ` · severidade ${severity}` : ''}</small>
-              </article>
-              <article class="kpi"><span>Alertas</span><strong>{fmtInt(data.alerts)}</strong><small>{fmtPct(data.alerts, data.total)} dos eventos filtrados</small></article>
-              <article class="kpi"><span>Severidade crítica (5)</span><strong>{fmtInt(data.by_severity[4])}</strong><small>{fmtPct(data.by_severity[4], data.total)} · altas (4): {fmtInt(data.by_severity[3])}</small></article>
-              <article class="kpi timing">
-                <span>Tempo de resposta</span>
-                <strong>{fmtMs(ov.timing?.db)}</strong>
-                <small>no banco ({ov.timing ? SOURCE_LABEL[ov.timing.source] : '—'}) · HTTP {fmtMs(ov.timing?.http)}</small>
-              </article>
-            </section>
-
-            {#if data.total === 0}
-              <div class="panel state-panel"><h2>Nenhum evento no período</h2><p>A consulta foi executada em {SOURCE_LABEL[source]} e retornou zero eventos para estes filtros. A massa de 1 M cobre 05/10 a 01/11/2026; a amostra, 06 a 08/11/2026.</p></div>
-            {:else}
-              <div class="grid">
-                <section class="panel wide">
-                  <div class="panel-head"><h2>Eventos por hora (UTC)</h2>{#if peakHour}<span class="muted">pico: {fmtInt(peakHour.total)} eventos em {fmtDay(peakHour.t)} {peakHour.t.slice(11, 13)}h</span>{/if}</div>
-                  <TimelineChart points={data.series} {visible} />
-                  <details class="table-view">
-                    <summary>Ver como tabela (por dia)</summary>
-                    <table>
-                      <thead><tr><th>Dia (UTC)</th>{#each CATEGORIES as c}<th>{CATEGORY_LABEL[c]}</th>{/each}<th>Total</th></tr></thead>
-                      <tbody>{#each perDay as [day, row]}<tr><td>{day}</td>{#each row as v}<td class="num">{fmtInt(v)}</td>{/each}</tr>{/each}</tbody>
-                    </table>
-                  </details>
-                </section>
-                <section class="panel">
-                  <div class="panel-head"><h2>Distribuição por severidade</h2></div>
-                  <SeverityBars values={data.by_severity} selected={severity === '' ? null : severity} />
-                </section>
-                <section class="panel">
-                  <div class="panel-head"><h2>Participação por categoria</h2></div>
-                  <CategoryShare values={data.by_category} />
-                </section>
-              </div>
-            {/if}
-          </div>
-        {/if}
-
-        <section class="panel compare">
-          <div class="panel-head"><h2>Comparação ao vivo · PostgreSQL × Cassandra</h2><span class="muted">consultas reais, executadas agora</span></div>
-          <LiveCompare {from} {to} category={category || null} severity={severity === '' ? null : severity} />
-        </section>
+      <div class="view" hidden={view !== 'overview'}>
+        <OverviewView {source} {from} {to} {days} category={category || null} severity={severity === '' ? null : severity} oncompare={() => go('compare')} />
       </div>
-
-      <div hidden={view !== 'investigate'}>
-        <section class="panel">
-          <div class="panel-head"><h2>Investigação de eventos</h2><span class="muted">padrões de acesso Q1, Q2 e Q3 · até 7 dias</span></div>
-          <EventExplorer {source} {from} {to} />
-        </section>
+      <div class="view" hidden={view !== 'investigate'}>
+        <EventExplorer {source} {from} {to} />
       </div>
-
-      <div hidden={view !== 'benchmarks'}>
-        <section class="panel">
-          <div class="panel-head"><h2>Resultados medidos</h2><span class="muted">benchmarks/results · gerado por run_benchmarks.py</span></div>
-          <BenchmarkPanel />
-        </section>
+      <div class="view" hidden={view !== 'compare'}>
+        <LiveCompare {from} {to} {days} category={category || null} severity={severity === '' ? null : severity} />
+      </div>
+      <div class="view" hidden={view !== 'benchmarks'}>
+        <BenchmarkPanel />
       </div>
     </main>
-    <footer class="main-footer">
-      <span>Fonte selecionada: {SOURCE_LABEL[source]}{runtime ? ` · API ${runtime.build}` : ''}</span>
-      <span>Tempos: “no banco” = Server-Timing da API (driver + banco); HTTP = medido no navegador.</span>
+
+    <footer class="footer">
+      <span>{showSource ? `Fonte selecionada: ${SOURCE_LABEL[source]}` : view === 'compare' ? 'Fontes: PostgreSQL e Cassandra' : 'Resultados de benchmarks/results'}{runtime ? ` · API ${runtime.build}` : ''}</span>
+      <span>Tempo “no banco” = Server-Timing da API (driver + banco) · HTTP = medido no navegador.</span>
     </footer>
   </div>
 </div>
+
+<style>
+  /* ---- sidebar ---- */
+  .brand { display: flex; align-items: center; gap: 11px; padding: 2px 6px 0; }
+  .logo { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; color: var(--accent-text);
+    background: var(--accent-soft); border: 1px solid var(--accent-line); }
+  .name { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; display: grid; line-height: 1.2; }
+  .name small { font-size: 11.5px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-top: 2px; }
+
+  .nav { display: grid; gap: 3px; }
+  .nav .group { padding: 10px 10px 6px; font-size: 10.5px; }
+  .nav .group:first-child { padding-top: 0; }
+  .nav a { position: relative; display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: 10px; color: var(--text-2);
+    text-decoration: none; font-size: 14px; font-weight: 500; border: 1px solid transparent; transition: background-color 0.15s, color 0.15s; }
+  .nav a:hover { background: var(--card); color: var(--text); }
+  .nav a.active { background: var(--card); border-color: var(--line-soft); color: var(--text); }
+  .nav a.active :global(.icon) { color: var(--accent-text); }
+  .nav a.active::before { content: ""; position: absolute; left: -16px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+
+  .services { display: grid; gap: 7px; padding: 14px; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--bg); }
+  .services-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+  .services-head .btn { width: 28px; min-height: 28px; border-color: transparent; }
+  .svc { display: grid; grid-template-columns: 8px auto 1fr; align-items: center; gap: 9px; font-size: 12.5px; color: var(--text-2); }
+  .svc i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .svc span { color: var(--text); font-weight: 500; }
+  .svc em { font-style: normal; text-align: right; color: var(--muted); font-size: 12px; line-height: 1.3; }
+  .svc.up i { background: var(--good); box-shadow: 0 0 0 3px rgba(63, 191, 127, 0.14); }
+  .svc.down i { background: var(--critical); box-shadow: 0 0 0 3px rgba(224, 93, 93, 0.16); }
+  .svc.down em { color: var(--critical-text); }
+  /* "Não verificado" is unknown, not down: neutral hollow marker. */
+  .svc.unknown i { background: transparent; border: 1.5px solid var(--muted); }
+
+  .dataset { margin-top: auto; display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line-soft); }
+  .dataset-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--steel-soft); color: var(--steel-text); }
+  .dataset p { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+  .dataset strong { display: block; color: var(--text); font-weight: 600; font-size: 12.5px; margin-bottom: 2px; }
+  .credit { font-size: 11px; color: var(--muted); line-height: 1.55; padding: 0 6px; }
+
+  /* ---- topbar ---- */
+  .topbar { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; flex-wrap: wrap; padding: 22px 28px 18px; }
+  .crumbs { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .crumbs span:last-child { color: var(--text-2); }
+  .topbar h1 { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; margin-top: 6px; outline: none; }
+  .subtitle { font-size: 13px; color: var(--text-2); margin-top: 4px; max-width: 70ch; }
+
+  .source { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 13px; background: var(--sidebar); }
+  .source button { display: flex; gap: 10px; align-items: center; background: none; border: 1px solid transparent; border-radius: 10px;
+    padding: 6px 14px 6px 8px; text-align: left; color: var(--text-2); transition: background-color 0.15s, color 0.15s; }
+  .source button:hover { color: var(--text); background: var(--card); }
+  .source button.on { background: var(--card-3); border-color: var(--line); color: var(--text); }
+  .src-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--card-2); color: var(--text-2); }
+  .source button.on .src-icon { background: var(--accent-soft); color: var(--accent-text); }
+  .src-text { font-size: 13.5px; font-weight: 600; line-height: 1.25; }
+  .src-text small { display: block; font-size: 11px; font-weight: 450; color: var(--muted); }
+
+  /* ---- filter toolbar ---- */
+  .toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 20px; align-items: flex-end; margin: 0 28px; padding: 14px 16px;
+    background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .toolbar-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 500; margin-right: 4px; }
+  .inputs { display: flex; flex-wrap: wrap; gap: 10px; }
+  .inputs select { min-width: 112px; }
+
+  .banner { display: flex; gap: 10px; align-items: flex-start; border: 1px solid rgba(224, 93, 93, 0.4); background: rgba(224, 93, 93, 0.08);
+    color: var(--critical-text); border-radius: 12px; padding: 12px 14px; font-size: 13px; margin-bottom: 18px; line-height: 1.5; }
+  .banner :global(.icon) { margin-top: 2px; }
+  .banner strong { color: var(--critical-text); }
+
+  .footer { display: flex; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; padding: 14px 28px 22px; font-size: 11.5px; color: var(--muted); }
+
+  /* ---- tablet & phone: the sidebar becomes a top bar ---- */
+  @media (max-width: 1024px) {
+    .shell { flex-direction: column; }
+    .sidebar { width: auto; height: auto; position: static; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+      padding: 14px 16px; border-right: 0; border-bottom: 1px solid var(--line-soft); overflow: visible; }
+    .nav { display: flex; gap: 4px; flex: 1 1 auto; overflow-x: auto; scrollbar-width: none; }
+    .nav .group { display: none; }
+    .nav a { padding: 8px 12px; white-space: nowrap; }
+    .nav a.active::before { display: none; }
+    .services { order: 3; width: 100%; display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 10px 12px; }
+    .services-head { order: 9; margin: 0 0 0 auto; }
+    .services-head .eyebrow { display: none; }
+    .svc { grid-template-columns: 8px auto auto; }
+    .dataset, .credit { display: none; }
+    .topbar { padding: 18px 16px 14px; }
+    .toolbar { margin: 0 16px; }
+    .content { padding: 18px 16px 8px; }
+    .footer { padding: 12px 16px 20px; }
+  }
+  @media (max-width: 640px) {
+    .brand .name small { display: none; }
+    .nav { order: 2; width: 100%; flex-basis: 100%; }
+    .nav a { flex: 1; justify-content: center; padding: 8px 6px; font-size: 13px; gap: 7px; }
+    .topbar h1 { font-size: 22px; }
+    .source { width: 100%; }
+    .source button { flex: 1; padding-right: 8px; }
+    .inputs { width: 100%; }
+    .inputs .field { flex: 1 1 130px; }
+    .inputs input, .inputs select { width: 100%; min-width: 0; }
+  }
+  @media (max-width: 420px) {
+    .nav { gap: 2px; }
+    .nav a { padding: 8px 2px; font-size: 12px; }
+    .nav a :global(.icon) { display: none; }
+  }
+</style>

@@ -8,11 +8,13 @@ export const fmtCompact = (value: number) => (Math.abs(value) < 10000 ? integer.
 export function fmtMs(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return '—'
   const digits = value < 10 ? 2 : value < 100 ? 1 : 0
-  return `${value.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })} ms`
+  // Round the binary value first (3.735 -> 3,73), matching the methodology tables; Intl alone rounds ties up.
+  const rounded = Number(value.toFixed(digits))
+  return `${rounded.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })} ms`
 }
 
 export const fmtRatio = (value: number | null | undefined) =>
-  value ? `${value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}×` : '—'
+  value ? `${value.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}×` : '—'
 
 export const fmtPct = (part: number, whole: number) =>
   whole ? `${((100 * part) / whole).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%` : '0%'
@@ -27,6 +29,18 @@ export function fmtUtc(iso: string, withSeconds = false): string {
 export const fmtDay = (iso: string) => {
   const d = new Date(iso)
   return `${two(d.getUTCDate())}/${two(d.getUTCMonth() + 1)}`
+}
+export const fmtDate = (iso: string) => `${fmtDay(iso)}/${new Date(iso).getUTCFullYear()}`
+const WEEKDAY = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
+export const fmtWeekday = (iso: string) => WEEKDAY[new Date(iso).getUTCDay()]
+export const fmtHour = (iso: string) => `${two(new Date(iso).getUTCHours())}h`
+
+/** "26/10 – 01/11/2026 · 7 dias" for a half-open [from, to) window of whole days. */
+export function fmtPeriod(from: string, to: string): string {
+  const last = new Date(Date.parse(to) - 1).toISOString()
+  const days = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000)
+  const range = days <= 1 ? fmtDate(from) : `${fmtDay(from)} – ${fmtDate(last)}`
+  return `${range} · ${days} ${days === 1 ? 'dia' : 'dias'}`
 }
 
 export function median(values: number[]): number | null {

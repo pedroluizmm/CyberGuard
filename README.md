@@ -79,14 +79,17 @@ A massa é gerada em streaming a partir de uma seed fixa, e nenhum arquivo de ev
 
 ## Dashboard
 
+Interface escura com barra lateral e quatro seções (o endereço guarda a seção, por exemplo `#comparacao`). A barra de filtros é comum a todas elas: período (atalhos ou data + 1 a 7 dias), categoria e severidade.
+
 - **Visão geral:**
-  - indicadores (eventos, alertas, críticos, tempo de resposta), série horária por categoria, distribuição por severidade e participação por categoria;
-  - filtros de período (atalhos ou data + 1 a 7 dias), categoria e severidade;
-  - seletor **PostgreSQL / Cassandra**: todas as consultas são refeitas na fonte escolhida.
-- **Comparação ao vivo:** executa a mesma consulta (painel, Q1 ou Q3) N vezes nos dois bancos e mostra as medianas e cada execução. Também verifica se o resultado de negócio é idêntico.
-- **Investigação:** Q1 dispositivo, Q2 IP e Q3 alertas, com paginação por cursor e tempo por página.
-- **Benchmarks:** resultados medidos (`benchmarks/results/summary.json`), N+1 antes e depois, controle E5 e escritas E6.
-- **Estados:** carregando, vazio, filtro inválido, banco indisponível e API inacessível. Nenhum dado é fixo ou simulado.
+  - indicadores de eventos, alertas, críticos e tempo de resposta;
+  - série horária por categoria, volume diário, severidade, categorias e indicadores de atividade (pico, média por hora, dia mais ativo);
+  - seletor **PostgreSQL / Cassandra** no topo: todas as consultas são refeitas na fonte escolhida.
+- **Investigação:** Q1 dispositivo, Q2 IP e Q3 alertas, com paginação por cursor, tempo por página e painel de detalhes do evento, com READ por UUID que confere o conteúdo.
+- **Comparação:** executa a mesma consulta (painel, Q1 ou Q3) N vezes nos dois bancos e mostra medianas lado a lado, a razão, cada execução e se o resultado de negócio é idêntico.
+- **Benchmarks:** resultados medidos (`benchmarks/results/summary.json`): destaques E4/E1–E3/E5/E6, protocolo e ambiente, medianas em escala log, N+1 antes e depois, controle E5, escritas E6 e limitações.
+- **Estados:** carregando, vazio, filtro inválido, banco indisponível, "não verificado" e API inacessível. Nenhum dado é fixo ou simulado.
+- **Acessibilidade:** responsivo de 390 px a desktop, navegação por teclado com foco visível, link para pular ao conteúdo. As cores dos gráficos foram validadas para daltonismo, e cada banco também se distingue pela forma: círculo para o PostgreSQL e losango para o Cassandra.
 
 ## API
 
@@ -145,7 +148,7 @@ python scripts/loading/reconcile_rollup.py              # simulação: rollup ==
 python scripts/validation/check_bulk.py --target 1000000
 ```
 
-O que foi executado e com qual resultado está registrado em [docs/verification/verification-task04.md](docs/verification/verification-task04.md), mais as tarefas [01](docs/verification/verification-task01.md), [02](docs/verification/verification-task02.md) e [03](docs/verification/verification-task03.md).
+O que foi executado e com qual resultado está registrado em [docs/verification/verification-task05.md](docs/verification/verification-task05.md) (testes completos, redesign do frontend e PDF da apresentação) e [verification-task04.md](docs/verification/verification-task04.md), mais as tarefas [01](docs/verification/verification-task01.md), [02](docs/verification/verification-task02.md) e [03](docs/verification/verification-task03.md).
 
 ## Segurança e persistência
 
@@ -166,4 +169,4 @@ O que foi executado e com qual resultado está registrado em [docs/verification/
 | Massa: geração, carga e validação | [docs/bulk-load.md](docs/bulk-load.md) |
 | Metodologia e resultados experimentais | [docs/benchmark-methodology.md](docs/benchmark-methodology.md) |
 | Entregas (10/11, 17/11, 19/11, 24/11) | [docs/entregas/](docs/entregas/README.md) |
-| Slides, roteiro e demonstração | [docs/apresentacao/](docs/apresentacao/slides.html) |
+| Apresentação final (PDF), fonte editável, roteiro e demonstração | [CyberGuard_Apresentacao_Final.pdf](docs/apresentacao/CyberGuard_Apresentacao_Final.pdf) · [slides.html](docs/apresentacao/slides.html) · [roteiro](docs/apresentacao/roteiro-apresentacao.md) · [demo](docs/apresentacao/roteiro-demo.md) |

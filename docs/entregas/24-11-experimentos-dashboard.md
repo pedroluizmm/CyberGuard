@@ -47,7 +47,7 @@ O ganho se deve à modelagem orientada a consultas e à escrita barata que torna
 | Tempo em ms e comparação visual | Tempo no banco (`Server-Timing`) e HTTP (navegador) em cada consulta; "Comparação ao vivo" com N execuções intercaladas, barras, pontos por execução e verificação de resultado idêntico; aba Benchmarks com medianas, IQR, pares vencidos, N+1, E5 e E6 |
 | Dados reais | Toda visualização vem de consulta à API. Os benchmarks vêm de `summary.json` medido. Sem dados fixos ou simulados |
 | Estados | Carregando (mantém a tela anterior esmaecida), vazio, erro de filtro, banco indisponível (banner e indicador de saúde) e API inacessível, todos testados parando a API e cada banco |
-| Demonstração do ganho NoSQL | "Comparação ao vivo · Painel agregado" com os filtros atuais |
+| Demonstração do ganho NoSQL | Seção **Comparação** · "Painel agregado", com os filtros atuais |
 
 ## Limitações
 
@@ -61,4 +61,4 @@ Detalhes em [../benchmark-methodology.md](../benchmark-methodology.md#limitaçõ
 
 ## Apresentação
 
-Os slides estão em [../apresentacao/slides.html](../apresentacao/slides.html), o roteiro de 20 minutos em [../apresentacao/roteiro-apresentacao.md](../apresentacao/roteiro-apresentacao.md) e a demonstração ao vivo em [../apresentacao/roteiro-demo.md](../apresentacao/roteiro-demo.md).
+Os slides estão em [../apresentacao/CyberGuard_Apresentacao_Final.pdf](../apresentacao/CyberGuard_Apresentacao_Final.pdf) (fonte editável: [slides.html](../apresentacao/slides.html)), o roteiro de 20 minutos em [../apresentacao/roteiro-apresentacao.md](../apresentacao/roteiro-apresentacao.md) e a demonstração ao vivo em [../apresentacao/roteiro-demo.md](../apresentacao/roteiro-demo.md).

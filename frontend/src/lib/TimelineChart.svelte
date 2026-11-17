@@ -5,8 +5,8 @@
   let { points, visible }: { points: Point[]; visible: Category[] } = $props()
 
   const color: Record<Category, string> = { authentication: 'var(--cat-auth)', network: 'var(--cat-net)', alert: 'var(--cat-alert)' }
-  const height = 260
-  const m = { top: 14, right: 18, bottom: 30, left: 52 }
+  const height = 268
+  const m = { top: 12, right: 14, bottom: 30, left: 48 }
   let width = $state(720)
   let hover = $state<number | null>(null)
   let svg: SVGSVGElement | undefined = $state()
@@ -57,7 +57,8 @@
 
 <div class="chart" bind:clientWidth={width}>
   <div class="legend" aria-hidden="true">
-    {#each visible as c}<span><i style:background={color[c]}></i>{CATEGORY_LABEL[c]}</span>{/each}
+    {#each visible as c (c)}<span><i style:background={color[c]}></i>{CATEGORY_LABEL[c]}</span>{/each}
+    <span class="hint">passe o mouse ou use as setas</span>
   </div>
   <svg bind:this={svg} {width} {height} role="slider" tabindex="0"
     aria-label={`Eventos por hora (UTC), ${points.length} horas. Use as setas para percorrer.`}
@@ -79,7 +80,7 @@
     {#if active && hover !== null}
       <line class="crosshair" x1={x(hover)} x2={x(hover)} y1={m.top} y2={m.top + innerH} />
       {#each visible as c}
-        <circle cx={x(hover)} cy={y(active.by_category[index(c)])} r="4.5" fill={color[c]} stroke="var(--surface)" stroke-width="2" />
+        <circle cx={x(hover)} cy={y(active.by_category[index(c)])} r="4.5" fill={color[c]} stroke="var(--card)" stroke-width="2" />
       {/each}
     {/if}
   </svg>
@@ -97,20 +98,22 @@
 <style>
   .chart { position: relative; width: 100%; }
   svg { display: block; overflow: visible; touch-action: pan-y; }
-  svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
-  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
+  svg:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 4px; border-radius: 6px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--text-2); margin-bottom: 10px; }
   .legend span { display: inline-flex; align-items: center; gap: 7px; }
-  .legend i, .tooltip i { width: 14px; height: 2px; border-radius: 2px; display: inline-block; }
+  .legend .hint { margin-left: auto; color: var(--muted); font-size: 11.5px; }
+  .legend i, .tooltip i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
   .grid { stroke: var(--grid); stroke-width: 1; }
   .axis { stroke: var(--axis); stroke-width: 1; }
   .tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
-  .crosshair { stroke: var(--text-2); stroke-width: 1; opacity: .5; }
-  .tooltip { position: absolute; top: 30px; transform: translateX(14px); background: var(--surface-3); border: 1px solid var(--line-strong);
-    border-radius: 8px; padding: 9px 11px; min-width: 150px; pointer-events: none; box-shadow: 0 8px 24px #0007; z-index: 2; }
+  .crosshair { stroke: var(--text-2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.6; }
+  .tooltip { position: absolute; top: 34px; transform: translateX(14px); background: var(--card-3); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; min-width: 160px; pointer-events: none; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55); z-index: 2; }
   .tooltip.flip { transform: translateX(calc(-100% - 14px)); }
   .tooltip p { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 3px 0; }
   .tooltip strong { font-variant-numeric: tabular-nums; color: var(--text); min-width: 46px; }
   .tooltip span { color: var(--text-2); }
   .tip-title { color: var(--muted) !important; font-size: 11px !important; margin-bottom: 6px !important; }
-  .tip-total { border-top: 1px solid var(--line); padding-top: 5px; margin-top: 6px !important; }
+  .tip-total { border-top: 1px solid var(--line); padding-top: 6px; margin-top: 6px !important; }
+  @media (max-width: 640px) { .legend .hint { display: none; } }
 </style>

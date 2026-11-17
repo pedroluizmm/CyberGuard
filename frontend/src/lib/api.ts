@@ -6,6 +6,8 @@ export type Source = 'postgresql' | 'cassandra'
 export const SOURCES: readonly Source[] = ['postgresql', 'cassandra']
 export const SOURCE_LABEL: Record<Source, string> = { postgresql: 'PostgreSQL', cassandra: 'Cassandra' }
 export const SOURCE_KIND: Record<Source, string> = { postgresql: 'Relacional · SQL', cassandra: 'Wide-column · CQL' }
+export const SOURCE_SHORT: Record<Source, string> = { postgresql: 'PG', cassandra: 'CS' }
+export const SOURCE_ICON: Record<Source, 'relational' | 'widecol'> = { postgresql: 'relational', cassandra: 'widecol' }
 
 export type Probe = { status: 'up' | 'down'; duration_ms: number; error: string | null }
 export type StorageHealth = { status: 'ok' | 'degraded'; cassandra: Probe; postgresql: Probe }
@@ -51,6 +53,13 @@ export class ApiError extends Error {
   constructor(readonly kind: ErrorKind, readonly code: string, message: string, readonly status?: number) {
     super(message)
   }
+}
+
+/** JSON with object keys sorted: lets the UI compare business results byte for byte. */
+export function canonicalJson(raw: string): string {
+  const sort = (v: unknown): unknown => Array.isArray(v) ? v.map(sort)
+    : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sort((v as Record<string, unknown>)[k])])) : v
+  return JSON.stringify(sort(JSON.parse(raw)))
 }
 
 /** Result plus the two latencies shown in the UI. */
@@ -122,6 +131,9 @@ export function queryPath(source: Source, kind: QueryKind, value: string, from: 
   return `/api/${source}/queries/${kind}?${query}`
 }
 export const getPage = (path: string) => call<EventPage>(path, isPage)
+/** READ by UUID (the E1 operation): GET /api/{source}/events/{id}. */
+export const getEvent = (source: Source, id: string) =>
+  call<Envelope>(`/api/${source}/events/${encodeURIComponent(id)}`, isEnvelope)
 
 export async function getHealth(): Promise<Health> {
   const { data } = await call<Health>('/api/health', (b) => record(b) && b.status === 'ok' && b.service === 'cyberguard-api', 12000)
