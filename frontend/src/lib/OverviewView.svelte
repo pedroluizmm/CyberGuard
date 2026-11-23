@@ -121,7 +121,7 @@
     {#if data.total === 0}
       <div class="card state">
         <h2><span class="icon-wrap"><Icon name="info" size={17} /></span>Nenhum evento no período</h2>
-        <p>A consulta foi executada em {SOURCE_LABEL[source]} e retornou zero eventos para estes filtros. A massa de 1 M cobre 05/10 a 01/11/2026; a amostra, 06 a 08/11/2026.</p>
+        <p>A consulta foi executada em {SOURCE_LABEL[source]} e retornou zero eventos para estes filtros. A massa sintética cobre 05/10 a 01/11/2026; a amostra, 06 a 08/11/2026.</p>
       </div>
     {:else}
       <div class="grid-main">

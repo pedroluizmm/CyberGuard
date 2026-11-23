@@ -1,32 +1,22 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
   import BenchmarkChart from './BenchmarkChart.svelte'
   import Icon from './Icon.svelte'
-  import { ApiError, getBenchmarks, SOURCE_LABEL, SOURCES, type BenchmarkSummary, type ControlEntry, type Operation, type Writes } from './api'
-  import { fmtInt, fmtMs, fmtRatio, fmtUtc } from './format'
+  import { SOURCE_LABEL, SOURCES, type ControlEntry, type Operation, type RunSet, type Writes } from './api'
+  import { fmtBytes, fmtEvents, fmtInt, fmtMs, fmtRatio, fmtShare, fmtUtc } from './format'
 
-  // Everything here comes from benchmarks/results/summary.json, served read-only by the API.
-  let status = $state<'loading' | 'ready' | 'missing' | 'error'>('loading')
-  let summary = $state<BenchmarkSummary | null>(null)
-  let message = $state('')
+  // One recorded scenario (historic 1M or one size of the scale campaign). Every value comes from
+  // benchmarks/results/summary.json, served read-only by the API; nothing here is measured live.
+  let { set }: { set: RunSet } = $props()
 
-  async function load() {
-    status = 'loading'
-    try {
-      summary = (await getBenchmarks()).data
-      status = 'ready'
-    } catch (e) {
-      const err = e instanceof ApiError ? e : null
-      status = err?.kind === 'not_found' ? 'missing' : 'error'
-      message = err?.message ?? 'Falha inesperada.'
-    }
-  }
-  onMount(load)
-
-  const main = $derived(summary?.main ?? null)
+  const summary = $derived(set)
+  const main = $derived(set.main)
   const env = $derived((main?.environment ?? {}) as Record<string, any>)
+  const size = $derived(Number(env.dataset?.logical_events ?? main?.logical_events ?? 0))
   const reads = $derived(main?.operations ?? [])
   const n1 = $derived(summary?.n1 ? summary.n1.operations : [])
+  const cache = $derived((main?.cache?.read_phase ?? null) as Record<string, any> | null)
+  const diskRead = $derived(cache?.disk_read_bytes ? Object.values(cache.disk_read_bytes as Record<string, number>).reduce((a, b) => a + b, 0) : null)
+  const power = $derived((env.host?.power ?? null) as { on_ac_power?: boolean; battery_percent?: number; power_plan?: string } | null)
   const control = $derived((main?.pg_control ?? {}) as Record<string, ControlEntry>)
   const rollup = $derived(reads.find((o) => o.id === 'overview_7d'))
   const pgWins = $derived(reads.filter((o) => o.faster === 'postgresql'))
@@ -50,22 +40,7 @@
   }
 </script>
 
-{#if status === 'loading'}
-  <p class="sr-only" role="status">Carregando resultados medidos…</p>
-  <div class="highlights" aria-hidden="true">{#each [0, 1, 2, 3] as i (i)}<div class="card"><div class="skeleton" style="height:120px"></div></div>{/each}</div>
-  <div class="card" aria-hidden="true"><div class="skeleton" style="height:360px"></div></div>
-{:else if status === 'missing'}
-  <div class="card state">
-    <h2><span class="icon-wrap"><Icon name="flask" size={17} /></span>Nenhum benchmark executado</h2>
-    <p>Rode <code>python benchmarks/run_benchmarks.py</code> com a API em build release. Nada é exibido sem medição real.</p>
-  </div>
-{:else if status === 'error'}
-  <div class="card state error" role="alert">
-    <h2><span class="icon-wrap"><Icon name="alert" size={17} /></span>Resultados indisponíveis</h2>
-    <p>Não foi possível carregar os resultados: {message}</p>
-    <button class="btn" onclick={load}><Icon name="refresh" size={15} />Tentar novamente</button>
-  </div>
-{:else if main}
+{#if main}
   <section class="highlights" aria-label="Destaques dos resultados">
     {#if rollup?.faster}
       <article class="card hl nosql">
@@ -112,10 +87,13 @@
     </div>
     <dl class="protocol">
       <div><dt>Execução</dt><dd class="mono">{main.run_id}</dd><dd class="sub">{fmtUtc(main.finished_at)} UTC · {main.complete ? 'completa' : 'incompleta'}</dd></div>
-      <div><dt>Protocolo</dt><dd>{main.protocol.runs} medições + {main.protocol.warmup} aquecimentos</dd><dd class="sub">por operação e banco · pares intercalados, ordem alternada · cache quente</dd></div>
-      <div><dt>Hardware</dt><dd>{env.host?.cpu_model ?? env.host?.processor ?? '—'}</dd><dd class="sub">{env.host?.logical_cpus} CPUs lógicas · {env.host?.ram_total_gib} GiB · VM Docker {env.docker?.vm_cpus} vCPU / {env.docker?.vm_memory_gib} GiB</dd></div>
+      <div><dt>Protocolo</dt><dd>{main.protocol.runs} medições + {main.protocol.warmup} aquecimentos</dd><dd class="sub">por operação e banco · pares intercalados, ordem alternada · cache quente{Number(main.protocol.prewarm_passes) ? ` · ${main.protocol.prewarm_passes} passadas de pré-aquecimento descartadas` : ''}</dd></div>
+      <div><dt>Hardware</dt><dd>{env.host?.cpu_model ?? env.host?.processor ?? '—'}</dd><dd class="sub">{env.host?.logical_cpus} CPUs lógicas · {env.host?.ram_total_gib} GiB · VM Docker {env.docker?.vm_cpus} vCPU / {env.docker?.vm_memory_gib} GiB{power ? ` · ${power.on_ac_power ? 'na tomada' : `na bateria (${power.battery_percent}%)`}, plano ${power.power_plan ?? '—'}` : ''}</dd></div>
       <div><dt>Versões</dt><dd>PostgreSQL {(env.postgresql?.version ?? '').split(' ')[1] ?? '—'} · Cassandra {env.cassandra?.version ?? '—'}</dd><dd class="sub">API {main.protocol.api_build} · leituras canônicas concorrentes = {main.protocol.cassandra_read_concurrency} · 1 nó Cassandra (RF=1)</dd></div>
-      <div><dt>Massa</dt><dd>{fmtInt(Number(env.dataset?.logical_events ?? 0))} eventos lógicos</dd><dd class="sub">{fmtInt(Number(env.postgresql?.events_rows ?? 0))} linhas em events (PG) · mesma massa nos dois bancos</dd></div>
+      <div><dt>Massa</dt><dd>{fmtInt(size)} eventos lógicos</dd><dd class="sub">{fmtInt(Number(env.postgresql?.events_rows ?? 0))} linhas em events (PG){env.postgresql?.database_bytes ? ` · banco PG ${fmtBytes(Number(env.postgresql.database_bytes))}` : ''}{env.cassandra?.du_bytes?.['/var/lib/cassandra/data/cyberguard'] ? ` · keyspace Cassandra ${fmtBytes(Number(env.cassandra.du_bytes['/var/lib/cassandra/data/cyberguard']))}` : ''}</dd></div>
+      {#if cache}
+        <div><dt>Cache na fase de leitura</dt><dd>PG {fmtShare(cache.postgresql_shared_buffers?.hit_ratio)} · Cassandra {fmtShare(cache.cassandra_key_cache?.hit_ratio)}</dd><dd class="sub">acertos em shared_buffers (PG) e no key cache (Cassandra){diskRead !== null ? ` · leitura de disco dos contêineres: ${fmtBytes(diskRead)}` : ''}</dd></div>
+      {/if}
     </dl>
   </section>
 
@@ -157,7 +135,7 @@
             <tbody>
               <tr><td>PG · agregação na leitura</td><td class="num">{fmtMs(control.pg_on_read_aggregate_7d?.stats?.median)}</td><td class="num">{fmtMs(control.pg_on_read_aggregate_7d?.stats?.p95)}</td><td class="muted">psql</td></tr>
               <tr><td>PG · view materializada</td><td class="num"><strong>{fmtMs(control.pg_mv_read_7d?.stats?.median)}</strong></td><td class="num">{fmtMs(control.pg_mv_read_7d?.stats?.p95)}</td><td class="muted">psql</td></tr>
-              <tr><td>PG · REFRESH completo (1 M)</td><td class="num">{fmtMs(control.pg_mv_refresh_full?.stats?.median)}</td><td class="num">{fmtMs(control.pg_mv_refresh_full?.stats?.p95)}</td><td class="muted">psql</td></tr>
+              <tr><td>PG · REFRESH completo ({fmtEvents(size)})</td><td class="num">{fmtMs(control.pg_mv_refresh_full?.stats?.median)}</td><td class="num">{fmtMs(control.pg_mv_refresh_full?.stats?.p95)}</td><td class="muted">psql</td></tr>
               <tr><td>Cassandra · rollup</td><td class="num"><strong>{fmtMs(rollup?.sources.cassandra.db?.median)}</strong></td><td class="num">{fmtMs(rollup?.sources.cassandra.db?.p95)}</td><td class="muted">Server-Timing</td></tr>
             </tbody>
           </table>
@@ -216,7 +194,7 @@
           </div>
         {/each}
       </div>
-      <p class="note">Em negrito, a menor mediana de cada linha. O CREATE Cassandra inclui 2 LWT (Paxos), logged batch das projeções e o contador do rollup. Pool PostgreSQL ≥ número de clientes; uma execução anterior com pool 5 fica registrada em benchmarks/results.</p>
+      <p class="note">Em negrito, a menor mediana de cada linha. O CREATE Cassandra inclui 2 LWT (Paxos), logged batch das projeções e o contador do rollup. Pool PostgreSQL ≥ número de clientes{summary.n1 ? '; uma execução anterior com pool 5 fica registrada em benchmarks/results' : ''}.</p>
     </section>
   {/if}
 
@@ -225,7 +203,7 @@
     <ul>
       <li><strong>Um nó Cassandra (RF=1):</strong> não mede escalabilidade horizontal, replicação nem tolerância a falhas.</li>
       <li><strong>Cache quente</strong> e recursos compartilhados e assimétricos (5 GiB × 2 GiB), na mesma máquina.</li>
-      <li><strong>Massa sintética</strong> de 1 M; valores absolutos variam de 10% a 35% entre execuções, os vencedores se repetem.</li>
+      <li><strong>Massa sintética</strong> de {fmtEvents(size)}; valores absolutos variam entre execuções e com o estado do host (energia, processos), os vencedores se repetem.</li>
     </ul>
   </section>
 {/if}

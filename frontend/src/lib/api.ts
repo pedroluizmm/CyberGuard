@@ -182,15 +182,50 @@ export type Operation = {
 export type WriteOp = Record<Source, { latency: Stats | null; throughput_ops_s: Stats | null; errors: number }>
 export type Writes = { window: string[]; runs: number; warmup_runs?: number; events_per_run: number; concurrency: number; ops: Record<'create' | 'update' | 'delete', WriteOp>; window_total_after_cleanup: Record<Source, number | null> }
 export type ControlEntry = { first_ms: number | null; raw_ms: number[]; stats: Stats | null }
+export type CacheCounters = { hits: number; requests?: number; reads?: number; hit_ratio: number | null }
 export type BenchmarkRun = {
   run_id: string; suite: string; started_at: string; finished_at: string; complete: boolean
+  campaign?: string | null; logical_events?: number
   protocol: Record<string, string | number | null>
-  environment: { host?: Record<string, string | number>; docker?: Record<string, string | number>; dataset?: Record<string, unknown> }
+  environment: {
+    host?: Record<string, unknown>; docker?: Record<string, string | number>; dataset?: Record<string, unknown>
+    workload?: Record<string, number> | null; postgresql?: Record<string, unknown>; cassandra?: Record<string, unknown>
+  }
   operations: Operation[]
   pg_control?: Record<string, ControlEntry | string>
   writes?: Writes
+  cache?: { read_phase?: Record<string, CacheCounters | Record<string, number>> }
 }
-export type BenchmarkSummary = { generated_at: string; main: BenchmarkRun; n1: BenchmarkRun | null; writes?: BenchmarkRun | null; durability: BenchmarkRun | null }
+
+/** A coherent set of runs measured on the same dataset: what one dashboard scenario shows. */
+export type RunSet = { main: BenchmarkRun; n1?: BenchmarkRun | null; writes?: BenchmarkRun | null; durability?: BenchmarkRun | null }
+export type SizeEntry = RunSet & { logical_events: number; pilots: string[] }
+export type Replicate = { run_id: string; postgresql: number | null; cassandra: number | null; faster?: Source; ratio?: number | null }
+export type ScalePoint = {
+  logical_events: number; faster?: Source; ratio?: number | null; equivalent: boolean; iqr_separated?: boolean
+  covered_events: number | null; replicates?: Replicate[]
+} & Record<Source, { http: Partial<Stats>; db_median: number | null; items: number | null }>
+export type ScaleOperation = { id: string; experiment: string; title: string; class: string | null; points: ScalePoint[] }
+export type ScaleControl = { logical_events: number; pg_on_read_aggregate_7d: number | null; pg_mv_read_7d: number | null; pg_mv_refresh_full: number | null; cassandra_rollup_db_7d: number | null }
+export type ScaleWrites = { logical_events: number; config: 'padrao' | 'antes_do_fsync'; run_id: string } & Record<'create' | 'update' | 'delete', Record<Source, { median_ms: number | null; ops_s: number | null }>>
+export type Campaign = { sizes: SizeEntry[]; scale: { sizes: number[]; operations: ScaleOperation[]; control: ScaleControl[]; writes: ScaleWrites[] } }
+export type BenchmarkSummary = RunSet & { generated_at: string; schema?: number; campaigns?: Record<string, Campaign> }
 
 export const getBenchmarks = () => call<BenchmarkSummary>('/api/benchmarks/summary',
-  (b) => record(b) && record(b.main) && Array.isArray(b.main.operations), 15000)
+  (b) => record(b) && record(b.main) && Array.isArray(b.main.operations)
+    && (b.campaigns === undefined || record(b.campaigns)), 15000)
+
+/** Logical events loaded in one source: sum of the four weekly dashboards of the 28-day dataset window. */
+export const DATASET_WEEKS = ['2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26'].map((d) => ({
+  from: `${d}T00:00:00Z`, to: new Date(Date.parse(`${d}T00:00:00Z`) + 7 * 86_400_000).toISOString().replace('.000Z', 'Z'),
+}))
+export async function countDataset(source: Source): Promise<{ total: number; httpMs: number; dbMs: number }> {
+  let total = 0, httpMs = 0, dbMs = 0
+  for (const week of DATASET_WEEKS) {
+    const r = await getOverview(source, week)
+    total += r.data.total
+    httpMs += r.httpMs
+    dbMs += r.dbMs ?? 0
+  }
+  return { total, httpMs, dbMs }
+}

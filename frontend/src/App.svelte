@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte'
-  import BenchmarkPanel from './lib/BenchmarkPanel.svelte'
+  import BenchmarksView from './lib/BenchmarksView.svelte'
+  import DatasetCheck from './lib/DatasetCheck.svelte'
   import EventExplorer from './lib/EventExplorer.svelte'
   import Icon, { type IconName } from './lib/Icon.svelte'
   import LiveCompare from './lib/LiveCompare.svelte'
@@ -21,7 +22,7 @@
     { id: 'compare', slug: 'comparacao', label: 'Comparação', icon: 'compare', group: 'Análise',
       subtitle: 'A mesma consulta executada agora nos dois bancos: tempos reais e verificação do resultado.' },
     { id: 'benchmarks', slug: 'benchmarks', label: 'Benchmarks', icon: 'chart', group: 'Análise',
-      subtitle: 'Resultados experimentais medidos (E1–E6), com protocolo, ambiente e ressalvas.' },
+      subtitle: 'Resultados experimentais gravados (E1–E6): histórico de 1 M, campanha de escala e comparação entre volumes.' },
   ]
   const groups = ['Monitoramento', 'Análise']
   const viewFromHash = (): View => views.find((v) => v.slug === location.hash.replace(/^#\/?/, ''))?.id ?? 'overview'
@@ -125,7 +126,10 @@
 
     <div class="dataset">
       <span class="dataset-icon"><Icon name="layers" size={16} /></span>
-      <p><strong>Dados sintéticos</strong>Massa de 05/10 a 01/11/2026 e amostra de 06 a 08/11/2026. Horários em UTC.</p>
+      <div class="dataset-body">
+        <p><strong>Dados sintéticos</strong>Massa de 05/10 a 01/11/2026 e amostra de 06 a 08/11/2026. Horários em UTC.</p>
+        <DatasetCheck compact />
+      </div>
     </div>
     <p class="credit">UNIFOR · Banco de Dados NoSQL<br />Projeto 3 · 2026</p>
   </aside>
@@ -186,7 +190,7 @@
         <LiveCompare {from} {to} {days} category={category || null} severity={severity === '' ? null : severity} />
       </div>
       <div class="view" hidden={view !== 'benchmarks'}>
-        <BenchmarkPanel />
+        <BenchmarksView />
       </div>
     </main>
 
@@ -228,8 +232,9 @@
   /* "Não verificado" is unknown, not down: neutral hollow marker. */
   .svc.unknown i { background: transparent; border: 1.5px solid var(--muted); }
 
-  .dataset { margin-top: auto; display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line-soft); }
+  .dataset { margin-top: auto; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; padding: 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line-soft); }
   .dataset-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--steel-soft); color: var(--steel-text); }
+  .dataset-body { display: grid; gap: 10px; min-width: 0; }
   .dataset p { font-size: 12px; color: var(--text-2); line-height: 1.5; }
   .dataset strong { display: block; color: var(--text); font-weight: 600; font-size: 12.5px; margin-bottom: 2px; }
   .credit { font-size: 11px; color: var(--muted); line-height: 1.55; padding: 0 6px; }

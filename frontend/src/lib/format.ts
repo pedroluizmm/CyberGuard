@@ -19,6 +19,32 @@ export const fmtRatio = (value: number | null | undefined) =>
 export const fmtPct = (part: number, whole: number) =>
   whole ? `${((100 * part) / whole).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%` : '0%'
 
+/** A 0..1 ratio as a percentage ("98,9%"); "—" when unknown. */
+export const fmtShare = (ratio: number | null | undefined) =>
+  ratio === null || ratio === undefined || !Number.isFinite(ratio) ? '—'
+    : `${(100 * ratio).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`
+
+/** Signed relative change between two medians ("+412%", "−3%"). */
+export function fmtDelta(before: number | null | undefined, after: number | null | undefined): string {
+  if (!before || after === null || after === undefined) return '—'
+  const pct = (100 * (after - before)) / before
+  const digits = Math.abs(pct) < 10 ? 1 : 0
+  const text = Math.abs(pct).toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+  return `${pct > 0 ? '+' : pct < 0 ? '−' : ''}${text}%`
+}
+
+/** Dataset sizes: 1000000 -> "1 M", 2500000 -> "2,5 M" (milhões de eventos lógicos). */
+export const fmtEvents = (n: number) =>
+  n >= 1_000_000 ? `${(n / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} M` : integer.format(n)
+
+export function fmtBytes(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes)) return '—'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let value = bytes, unit = 0
+  while (value >= 1000 && unit < units.length - 1) { value /= 1000; unit++ }
+  return `${value.toLocaleString('pt-BR', { maximumFractionDigits: value < 10 && unit ? 2 : 1 })} ${units[unit]}`
+}
+
 const two = (n: number) => String(n).padStart(2, '0')
 /** All times are UTC in this project; the UI says so explicitly. */
 export function fmtUtc(iso: string, withSeconds = false): string {
