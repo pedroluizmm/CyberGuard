@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CyberGuard | A consulta em quatro passos</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="apresentacao.css">
+</head>
+<body>
+<nav class="controls" aria-label="Navegar entre os passos">
+  <a href="#pergunta">1. Pergunta</a>
+  <a href="#cassandra">2. Cassandra</a>
+  <a href="#postgresql">3. PostgreSQL</a>
+  <a href="#resultado">4. Resultado</a>
+</nav>
+<main>
+  <section class="slide" id="pergunta" aria-labelledby="titulo-pergunta">
+    <header class="masthead"><div class="wordmark">CyberGuard <span>UNIFOR V3</span></div><div>Passo 1 de 4 · A pergunta</div></header>
+    <div class="progress" aria-hidden="true"><span class="current"></span><span></span><span></span><span></span></div>
+    <div class="heading">
+      <h1 id="titulo-pergunta">Quantos eventos tivemos<br><span class="spot">por hora em sete dias?</span></h1>
+      <p>Uma pergunta do dashboard, dois caminhos para produzir a mesma resposta.</p>
+    </div>
+    <div class="stage-body">
+      <div class="split">
+        <article class="panel">
+          <h3>O que é o CyberGuard?</h3>
+          <p>Projeto acadêmico que compara Cassandra e PostgreSQL em um dashboard, consultas de investigação e benchmarks com eventos sintéticos de cibersegurança.</p>
+        </article>
+        <article class="panel">
+          <h3>A janela usada no benchmark</h3>
+          <p>26 de outubro a 1º de novembro de 2026 · UTC · todas as categorias e severidades</p>
+          <div class="week" aria-label="Sete datas da janela"><span>26/10</span><span>27/10</span><span>28/10</span><span>29/10</span><span>30/10</span><span>31/10</span><span>01/11</span></div>
+          <p class="week-caption">Exemplos de eventos: login, falha de autenticação, conexão suspeita e alerta.</p>
+        </article>
+      </div>
+      <div class="prompt">
+        <b>Dashboard</b><span class="arrow" aria-hidden="true">→</span><p>Envia período e filtros</p>
+        <span class="arrow" aria-hidden="true">→</span><b>API</b><p>Valida a janela UTC e chama a fonte selecionada</p>
+        <p class="api"><code>GET /api/{fonte}/stats/overview</code></p>
+      </div>
+    </div>
+    <footer class="footer"><div><a href="../../query-patterns.md#painel-agregado-task-04">Contrato do painel</a><a href="../roteiro-demo.md">Demonstração no dashboard</a></div><span>Benchmark E4 · janela fixa de sete dias</span></footer>
+  </section>
+
+  <section class="slide" id="cassandra" aria-labelledby="titulo-cassandra">
+    <header class="masthead"><div class="wordmark">CyberGuard <span>UNIFOR V3</span></div><div>Passo 2 de 4 · Cassandra</div></header>
+    <div class="progress" aria-hidden="true"><span class="current"></span><span class="current"></span><span></span><span></span></div>
+    <div class="heading">
+      <h2 id="titulo-cassandra"><span class="spot">Cassandra</span> prepara a contagem na escrita</h2>
+      <p>A pergunta definiu o desenho de <code>event_counts_by_day</code>.</p>
+    </div>
+    <div class="stage-body">
+      <div class="pipeline cassandra">
+        <article class="panel"><h3>1. Evento entra</h3><p>A API registra e ativa o evento. A transição aplicada dá direito a atualizar o agregado.</p></article>
+        <article class="panel"><h3>2. Contador recebe +1</h3><p>Na célula do dia, hora, categoria e severidade. A exclusão concluída aplica −1.</p></article>
+        <article class="panel"><h3>3. CQL lê por data</h3><p>Uma consulta por data UTC, em paralelo, com faixa de horas dentro de cada partição.</p></article>
+        <article class="panel"><h3>4. API devolve a série</h3><p>Filtra categoria e severidade quando pedido e soma os contadores para o dashboard.</p></article>
+      </div>
+      <div class="panel partition-map">
+        <p><b>Chave de partição</b><br><code>event_date</code> · dia UTC</p>
+        <div class="week" aria-label="Uma partição por data, com 27 de outubro destacada"><span>26/10</span><span class="selected">27/10</span><span>28/10</span><span>29/10</span><span>30/10</span><span>31/10</span><span>01/11</span></div>
+        <p>O hash da data gera o token que localiza a partição. Exemplo didático em 27/10: um alerta às 09h, severidade 3, soma 1 ao seu contador.</p>
+      </div>
+      <div class="callout cassandra">
+        <h3>Menos trabalho na leitura</h3>
+        <p>Até 360 contadores por dia. A manutenção acontece na escrita e falhas parciais podem exigir reconciliação do agregado.</p>
+      </div>
+    </div>
+    <footer class="footer"><div><a href="../../data-model.md#cassandra">Modelo Cassandra</a><a href="../../consistency.md#rollup-do-painel">Consistência do agregado</a><a href="https://cassandra.apache.org/doc/stable/cassandra/architecture/dynamo">Partições e tokens</a></div><span>Uma célula por hora × categoria × severidade</span></footer>
+  </section>
+
+  <section class="slide" id="postgresql" aria-labelledby="titulo-postgresql">
+    <header class="masthead"><div class="wordmark">CyberGuard <span>UNIFOR V3</span></div><div>Passo 3 de 4 · PostgreSQL</div></header>
+    <div class="progress" aria-hidden="true"><span class="current"></span><span class="current"></span><span class="current"></span><span></span></div>
+    <div class="heading">
+      <h2 id="titulo-postgresql"><span class="spot-blue">PostgreSQL</span> conta quando o painel consulta</h2>
+      <p>A consulta medida parte de <code>events</code>, a tabela relacional com uma linha por evento.</p>
+    </div>
+    <div class="stage-body">
+      <div class="pipeline postgresql">
+        <article class="panel"><h3>1. API envia SQL</h3><p>O dashboard pede o mesmo período e os mesmos filtros à outra fonte.</p></article>
+        <article class="panel"><h3>2. Índice delimita a faixa</h3><p><code>events_time_cover_idx</code> usa <code>occurred_at</code> e inclui categoria e severidade.</p></article>
+        <article class="panel"><h3>3. SQL agrupa e conta</h3><p>Filtra pelo período e pelos critérios opcionais. Agrupa por hora, categoria e severidade e faz <code>COUNT(*)</code>.</p></article>
+        <article class="panel"><h3>4. API devolve a série</h3><p>Usa os totais do SQL para devolver ao dashboard o mesmo formato da outra fonte.</p></article>
+      </div>
+      <div class="callout postgresql">
+        <h3>Cerca de 245 mil entradas de índice no recorte</h3>
+        <p>O plano medido usou <i>index-only scan</i>. O índice fornece os campos necessários, e o banco ainda precisa agrupar e contar as entradas do intervalo.</p>
+        <code class="statement">date_bin('1 hour', …) &nbsp;→&nbsp; GROUP BY hora, categoria, severidade &nbsp;→&nbsp; COUNT(*)</code>
+      </div>
+    </div>
+    <footer class="footer"><div><a href="../../query-patterns.md#painel-agregado-task-04">SQL do painel</a><a href="https://www.postgresql.org/docs/17/using-explain.html">Planos no PostgreSQL 17</a></div><span>Agregação na leitura no cenário E4</span></footer>
+  </section>
+
+  <section class="slide" id="resultado" aria-labelledby="titulo-resultado">
+    <header class="masthead"><div class="wordmark">CyberGuard <span>UNIFOR V3</span></div><div>Passo 4 de 4 · Resultado</div></header>
+    <div class="progress" aria-hidden="true"><span class="current"></span><span class="current"></span><span class="current"></span><span class="current"></span></div>
+    <div class="heading">
+      <h2 id="titulo-resultado">O ganho veio da contagem preparada</h2>
+      <p>Medianas HTTP do E4 · 244.881 eventos sintéticos na janela · 30 pares após 5 aquecimentos por banco.</p>
+    </div>
+    <div class="stage-body">
+      <div class="bench-grid">
+        <article class="callout cassandra"><h3>Cassandra</h3><div class="bench-number">3,28 ms</div><p>Sete partições de contadores preparados.</p></article>
+        <article class="callout postgresql"><h3>PostgreSQL</h3><div class="bench-number">71,94 ms</div><p>Agregação sobre as entradas da faixa.</p></article>
+        <article class="panel"><h3>Mesma resposta</h3><p>Os 30 pares bateram. Com pré-agregação no PostgreSQL (E5), a leitura ficou na mesma ordem de grandeza, em fronteiras de medição diferentes. A view depende de refresh.</p></article>
+      </div>
+      <div class="comparison">
+        <article class="panel"><h3>Quando usar Cassandra</h3><p>Consultas previsíveis por chave, com potencial para volume e escrita intensa em cluster. Perguntas ad hoc e joins exigem outro desenho. O lab de um nó deixa a escala horizontal fora da medição.</p></article>
+        <article class="panel"><h3>Quando usar PostgreSQL</h3><p>Joins, transações e análise flexível. No CyberGuard, venceu as buscas por ID, dispositivo, IP e alertas (E1–E3). Nas páginas, as projeções do Cassandra ainda exigem recuperar os eventos completos.</p></article>
+      </div>
+    </div>
+    <footer class="footer"><div><a href="../../benchmark-methodology.md">Método E4/E5</a><a href="../../../benchmarks/results/20261115T053008Z-main/raw.csv">CSV bruto</a></div><span>Execução 20261115T053008Z-main</span></footer>
+  </section>
+</main>
+</body>
+</html>

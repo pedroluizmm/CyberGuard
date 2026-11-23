@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CyberGuard | Fluxo comparativo</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="apresentacao.css">
+</head>
+<body>
+<main class="slide side-by-side">
+  <header class="masthead">
+    <div class="wordmark">CyberGuard <span>UNIFOR V3</span></div>
+    <div>Opção A · Comparação lado a lado</div>
+  </header>
+
+  <div class="heading">
+    <h1>Em que momento cada banco conta?</h1>
+    <p>O CyberGuard reúne dashboard, consultas e benchmarks sobre eventos como logins, falhas de autenticação, conexões suspeitas e alertas.</p>
+  </div>
+
+  <div class="prompt">
+    <div><b>Quantos eventos por hora em sete dias?</b><p>Dashboard · 26/10 a 01/11/2026 UTC · todas as categorias e severidades</p></div>
+    <p class="api">API valida o período e escolhe a fonte<br><code>GET /api/{fonte}/stats/overview</code></p>
+  </div>
+
+  <div class="comparison">
+    <section class="lane cassandra" aria-labelledby="cassandra">
+      <div class="lane-heading"><h2 id="cassandra">Cassandra</h2><span>Pré-agregação na escrita</span></div>
+      <ol class="steps">
+        <li><b>Tabela para a pergunta</b><p><code>event_counts_by_day</code> é atualizada na ativação e na exclusão do evento.</p></li>
+        <li><b>Chave <code>event_date</code></b><p>A data UTC agrupa os contadores. O hash da chave gera o token que localiza a partição.</p></li>
+        <li><b>7 partições em paralelo</b><p>O CQL limita as horas em cada dia. Categoria e severidade são filtradas na API.</p></li>
+        <li><b>Até 360 contadores por dia</b><p>A API soma contagens por hora, categoria e severidade que já estavam preparadas.</p></li>
+      </ol>
+      <div class="metric"><b>3,28 ms</b><p>Mediana HTTP no E4<br>Menos trabalho na leitura</p></div>
+    </section>
+
+    <section class="lane postgresql" aria-labelledby="postgresql">
+      <div class="lane-heading"><h2 id="postgresql">PostgreSQL</h2><span>Agregação na leitura</span></div>
+      <ol class="steps">
+        <li><b>Tabela relacional</b><p><code>events</code> mantém uma linha por evento. A API pede os totais via SQL.</p></li>
+        <li><b>Índice de cobertura</b><p><code>events_time_cover_idx</code> ordena por <code>occurred_at</code> e inclui categoria e severidade.</p></li>
+        <li><b>Faixa do período</b><p>O plano medido lê o índice (<i>index-only scan</i>). Filtros opcionais entram no SQL.</p></li>
+        <li><b>Cerca de 245 mil entradas</b><p>O SQL agrupa por hora, categoria e severidade e calcula <code>COUNT(*)</code>.</p></li>
+      </ol>
+      <div class="metric"><b>71,94 ms</b><p>Mediana HTTP no E4<br>Mais trabalho de agregação na leitura</p></div>
+    </section>
+  </div>
+
+  <div class="return">
+    <b>API → dashboard</b><p>Mesma série horária para os 244.881 eventos sintéticos do recorte.</p>
+    <span>30 de 30 pares com resposta idêntica</span>
+  </div>
+
+  <section class="takeaways" aria-label="Quando usar cada modelo">
+    <article><h3>Cassandra por chave</h3><p>Consultas previsíveis, grandes volumes e escrita intensa em cluster. Ad hoc e joins exigem outro desenho. O lab teve um nó.</p></article>
+    <article><h3>PostgreSQL em perguntas abertas</h3><p>Mais flexibilidade para joins, análise ad hoc e transações. Venceu por ID, dispositivo, IP e alertas (E1–E3).</p></article>
+    <article><h3>O efeito de preparar a resposta</h3><p>Com view materializada, o PostgreSQL chegou à mesma ordem de grandeza (E5, outra fronteira de medição). A view depende de refresh.</p></article>
+  </section>
+
+  <footer class="footer">
+    <div><a href="../../query-patterns.md#painel-agregado-task-04">Modelo e consultas</a><a href="../../benchmark-methodology.md">Método E4/E5</a><a href="../../../benchmarks/results/20261115T053008Z-main/raw.csv">CSV bruto</a></div>
+    <span>Execução 20261115T053008Z-main · 5 aquecimentos por banco</span>
+  </footer>
+</main>
+</body>
+</html>

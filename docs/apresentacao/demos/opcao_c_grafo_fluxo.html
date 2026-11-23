@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CyberGuard | Mapa da consulta</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="apresentacao.css">
+</head>
+<body>
+<main class="slide">
+  <header class="masthead">
+    <div class="wordmark">CyberGuard <span>UNIFOR V3</span></div>
+    <div>Opção C · Diagrama de fluxo</div>
+  </header>
+
+  <div class="heading">
+    <h1>Da pergunta à resposta</h1>
+    <p>O CyberGuard compara Cassandra e PostgreSQL com dashboard, consultas e benchmarks de logins, falhas de autenticação, conexões suspeitas e alertas.</p>
+  </div>
+
+  <div class="prompt">
+    <div><b>Dashboard · Quantos eventos por hora em sete dias?</b><p>26/10 a 01/11/2026 UTC · todas as categorias e severidades</p></div>
+    <p class="api">API valida e seleciona o banco<br><code>GET /api/{fonte}/stats/overview</code></p>
+    <span class="arrow" aria-hidden="true">↓</span>
+  </div>
+
+  <section class="graph cassandra" aria-labelledby="cassandra">
+    <div class="graph-label"><h2 id="cassandra">Cassandra</h2><p>3,28 ms · E4</p></div>
+    <div class="box"><b>Modelar para a consulta</b><p><code>event_counts_by_day</code><br>A API conta na ativação do evento e subtrai na exclusão concluída.</p></div>
+    <div class="box"><b>Escolher a chave</b><p><code>event_date</code> agrupa por dia UTC. O hash gera o token para localizar a partição.</p></div>
+    <div class="box"><b>Ler as partições</b><p>CQL em paralelo para as sete datas. A faixa limita as horas em cada partição.</p></div>
+    <div class="box emphasis"><b>Ler contagens prontas</b><p>Até 360 células/dia. A API filtra por categoria/severidade e soma. Menos trabalho na leitura.</p></div>
+  </section>
+
+  <section class="graph postgresql" aria-labelledby="postgresql">
+    <div class="graph-label"><h2 id="postgresql">PostgreSQL</h2><p>71,94 ms · E4</p></div>
+    <div class="box"><b>Consultar a tabela</b><p>A API usa SQL sobre <code>events</code>. A estrutura relacional guarda uma linha por evento.</p></div>
+    <div class="box"><b>Acessar pelo índice</b><p><code>events_time_cover_idx</code><br>O plano medido lê o índice de cobertura.</p></div>
+    <div class="box"><b>Filtrar por período</b><p><code>occurred_at</code> delimita a faixa. O SQL aplica filtros adicionais quando pedidos.</p></div>
+    <div class="box emphasis"><b>Agrupar e contar na leitura</b><p>Hora, categoria e severidade. O SQL agrega cerca de 245 mil entradas do índice.</p></div>
+  </section>
+
+  <figure class="panel partition-map">
+    <p><b>Uma data, uma partição</b><br><code>event_date</code> → token</p>
+    <div class="week" aria-label="Sete partições no mesmo nó, com a do dia 27 destacada"><span>26/10</span><span class="selected">27/10</span><span>28/10</span><span>29/10</span><span>30/10</span><span>31/10</span><span>01/11</span></div>
+    <figcaption><p>A partição destacada guarda as contagens de 27/10 por hora, categoria e severidade. Todas estão no mesmo nó do laboratório.</p></figcaption>
+  </figure>
+
+  <div class="return">
+    <b>API → dashboard</b><p>Mesma série horária para 244.881 eventos sintéticos.</p>
+    <span>E4 · medianas HTTP · 30 pares idênticos após aquecimento</span>
+  </div>
+
+  <section class="takeaways" aria-label="Aplicabilidade da comparação">
+    <article><h3>Cassandra por chave</h3><p>Padrões previsíveis, volume e escrita intensa em cluster. Consultas ad hoc e joins exigem outro desenho.</p></article>
+    <article><h3>Flexibilidade no PostgreSQL</h3><p>Consultas ad hoc, joins e transações. Venceu as buscas por ID, dispositivo, IP e alertas no CyberGuard.</p></article>
+    <article><h3>Pré-agregação muda o custo</h3><p>O PostgreSQL pré-agregado chegou à mesma ordem de grandeza no E5, com medição distinta e refresh completo.</p></article>
+  </section>
+
+  <footer class="footer">
+    <div><a href="../../data-model.md#cassandra">Modelagem</a><a href="../../benchmark-methodology.md">Método E4/E5</a><a href="../../../benchmarks/results/20261115T053008Z-main/raw.csv">CSV bruto</a></div>
+    <span>Execução 20261115T053008Z-main</span>
+  </footer>
+</main>
+</body>
+</html>
