@@ -1,10 +1,12 @@
 # CyberGuard
 
-Plataforma acadêmica de monitoramento e investigação de **eventos de cibersegurança**, implementada em **Apache Cassandra** (wide-column) e **PostgreSQL** (relacional) com o mesmo conjunto lógico de **1 000 000 de eventos**. Inclui CRUD equivalente, consultas de investigação, um dashboard SOC que consulta os dois bancos ao vivo e benchmarks reprodutíveis. Projeto 3 de Banco de Dados NoSQL, UNIFOR (paradigma 1: orientado a colunas).
+Plataforma acadêmica de monitoramento e investigação de **eventos de cibersegurança**, implementada em **Apache Cassandra** (wide-column) e **PostgreSQL** (relacional) com o mesmo conjunto lógico de eventos: **1 000 000** na campanha original e **2 000 000** (maior volume carregado e validado) na campanha de escala. Inclui CRUD equivalente, consultas de investigação, um dashboard SOC que consulta os dois bancos ao vivo e benchmarks reprodutíveis. Projeto 3 de Banco de Dados NoSQL, UNIFOR (paradigma 1: orientado a colunas).
 
 ## Resultados em resumo
 
 São 30 medições por operação e banco, em pares intercalados e com cache quente. Em todas as operações, os dois bancos devolveram resposta idêntica. Detalhes em [docs/benchmark-methodology.md](docs/benchmark-methodology.md).
+
+**Campanha histórica (15/11, 1 M):**
 
 | Experimento | PostgreSQL | Cassandra | Vencedor |
 | --- | --- | --- | --- |
@@ -15,7 +17,18 @@ São 30 medições por operação e banco, em pares intercalados e com cache que
 | E5 · Controle: PostgreSQL com view materializada | 1,15 ms leitura · 282 ms REFRESH | 1,79 ms (banco) | Leitura equivalente; trade-off de atualização |
 | E6 · CREATE concorrente: durabilidade padrão / ambos confirmando antes do fsync | 13,2 / 5,8 ms | 10,8 / 9,5 ms | Depende da política de `fsync` |
 
-**Conclusão:** o Cassandra vence onde a modelagem orientada a consultas permite pré-agregar na escrita (o painel). O 21,9× mede essa pré-agregação, não uma velocidade bruta maior do motor: com view materializada, o PostgreSQL lê o painel na mesma ordem de grandeza, mas depende de REFRESH completo. O PostgreSQL vence buscas por chave e escritas quando os dois bancos confirmam antes do fsync. A otimização do N+1 no Cassandra reduziu as páginas Q1–Q3 de 26–43 ms para 7–11 ms.
+**Campanha de escala (23/11, mesmo código e protocolo, 1 M → 2 M):** cada volume foi validado (22/22) antes de medir; a ampliação parou em 2 M por falta de energia (notebook na bateria), não por limite de hardware.
+
+| Experimento | 1 M PG × CS | 2 M PG × CS | O que mudou |
+| --- | --- | --- | --- |
+| E4 · Painel 7 dias (244 881 → 489 346 eventos) | 90,8 × 6,12 ms (CS 14,8×) | 173 × 7,93 ms (**CS 21,9×**) | Só o PostgreSQL agrega mais eventos: no banco, 88 → 171 ms; o rollup Cassandra ficou em ~3 ms |
+| E1–E3 · chave e páginas de 100 | PG 1,1× a 3,7× | PG 1,4× a 3,5× | Vencedor igual; variações dentro do ruído entre execuções (até 40%) |
+| E5 · view materializada / REFRESH | 1,54 / 360 ms | 1,09 / 640 ms | Leitura pré-agregada constante; o REFRESH cresce com a tabela |
+| E6 · CREATE padrão / antes do fsync | 10,7 × 8,79 / 4,55 × 8,17 ms | 10,3 × 7,98 / 4,60 × 7,85 ms | Sem efeito mensurável do volume; a política de fsync pesa mais |
+
+Os valores absolutos de 1 M diferem entre as campanhas (estado do host, energia); compare volumes **dentro** da mesma campanha. Tabela completa: `python benchmarks/scale_report.py`.
+
+**Conclusão:** o Cassandra vence onde a modelagem orientada a consultas permite pré-agregar na escrita (o painel), e essa vantagem cresce com a massa, porque o custo da agregação na leitura do PostgreSQL acompanha o número de eventos do período. O 21,9× mede essa pré-agregação, não uma velocidade bruta maior do motor: com view materializada, o PostgreSQL lê o painel na mesma ordem de grandeza, mas depende de REFRESH completo. O PostgreSQL vence buscas por chave e escritas quando os dois bancos confirmam antes do fsync. A otimização do N+1 no Cassandra reduziu as páginas Q1–Q3 de 26–43 ms para 7–11 ms.
 
 ## Arquitetura e organização
 
@@ -32,7 +45,7 @@ Scripts Python (carga, validação, benchmark) ──HTTP──┘
 | `database/` | Esquemas aditivos: `postgresql/00{1,2}_*.sql`, `cassandra/00{1,2}_*.cql` |
 | `scripts/` | Ambiente, esquemas, execução da API, geração/carga/validação da massa, reconciliação do rollup |
 | `benchmarks/` | Executor dos experimentos e resultados brutos (`results/`) |
-| `data/` | Amostra de 24 eventos, manifesto da massa de 1 M e relatórios de carga e validação |
+| `data/` | Amostra de 24 eventos, manifestos da massa (1 M original e o ampliado até 5 M) e relatórios de carga, validação e rollup |
 | `docs/` | Requisitos, arquitetura, modelos, consultas, consistência, metodologia, verificações, entregas e apresentação |
 
 ## Pré-requisitos (Windows)
@@ -73,9 +86,14 @@ python scripts/loading/load_bulk.py --source postgresql --target 1000000   # ~30
 python scripts/loading/load_bulk.py --source cassandra  --target 1000000   # ~25 min, retomável
 python scripts/loading/reconcile_rollup.py --apply                         # backfill do painel Cassandra
 python scripts/validation/check_bulk.py --target 1000000                   # 22 verificações (~4 min)
+# ampliação (opcional): manifesto até 5 M e carga incremental por marco
+python scripts/generation/generate_bulk.py --count 5000000
+python scripts/loading/load_bulk.py --source postgresql --target 2000000 --api-build release
+python scripts/loading/load_bulk.py --source cassandra  --target 2000000 --api-build release
+python benchmarks/run_scale_point.py --target 2000000                      # validação + rollup + E1-E6
 ```
 
-A massa é gerada em streaming a partir de uma seed fixa, e nenhum arquivo de eventos é gravado. O significado de "registro", a origem, os volumes e os tempos estão em [docs/entregas/19-11-massa-carga-dados.md](docs/entregas/19-11-massa-carga-dados.md).
+A massa é gerada em streaming a partir de uma seed fixa, e nenhum arquivo de eventos é gravado: o GitHub guarda só manifestos (hashes por chunk de 1 000 eventos) e relatórios pequenos, e qualquer volume até 5 M é reproduzido byte a byte pelo gerador. O significado de "registro", a origem, os volumes e os tempos estão em [docs/entregas/19-11-massa-carga-dados.md](docs/entregas/19-11-massa-carga-dados.md).
 
 ## Dashboard
 
@@ -87,7 +105,8 @@ Interface escura com barra lateral e quatro seções (o endereço guarda a seç�
   - seletor **PostgreSQL / Cassandra** no topo: todas as consultas são refeitas na fonte escolhida.
 - **Investigação:** Q1 dispositivo, Q2 IP e Q3 alertas, com paginação por cursor, tempo por página e painel de detalhes do evento, com READ por UUID que confere o conteúdo.
 - **Comparação:** executa a mesma consulta (painel, Q1 ou Q3) N vezes nos dois bancos e mostra medianas lado a lado, a razão, cada execução e se o resultado de negócio é idêntico.
-- **Benchmarks:** resultados medidos (`benchmarks/results/summary.json`): destaques E4/E1–E3/E5/E6, protocolo e ambiente, medianas em escala log, N+1 antes e depois, controle E5, escritas E6 e limitações.
+- **Benchmarks:** resultados gravados (`benchmarks/results/summary.json`), com seletor de cenário: **histórico de 1 M** (15/11), cada volume da **campanha de escala** (23/11) e a **comparação entre volumes** (pequenos múltiplos por operação, tabela com variação e razão, E5 e E6 por volume, armazenamento). Cada cenário mostra protocolo, ambiente, energia do notebook, cache na fase de leitura, medianas em escala log e limitações.
+- **Massa ao vivo:** o botão **Conferir massa nos dois bancos** (barra lateral e seção Benchmarks) soma agora os quatro painéis semanais em cada fonte e confirma que os totais são iguais.
 - **Estados:** carregando, vazio, filtro inválido, banco indisponível, "não verificado" e API inacessível. Nenhum dado é fixo ou simulado.
 - **Acessibilidade:** responsivo de 390 px a desktop, navegação por teclado com foco visível, link para pular ao conteúdo. As cores dos gráficos foram validadas para daltonismo, e cada banco também se distingue pela forma: círculo para o PostgreSQL e losango para o Cassandra.
 
@@ -126,6 +145,8 @@ Depois do DELETE, o READ retorna 404 e o UUID não pode ser reutilizado. As resp
 
 ```powershell
 python benchmarks/run_benchmarks.py --suite main      # E1-E6 (API release; ~2 min)
+python benchmarks/run_scale_point.py --target 2000000 # marco da campanha de escala (validação + E1-E6 + durabilidade)
+python benchmarks/scale_report.py                     # tabela consolidada menor × maior volume
 ```
 
 As variantes `n1` (N+1 sequencial) e `durability` (PostgreSQL `synchronous_commit=off`) exigem reiniciar a API com `--read-concurrency 1` ou `--pg-synchronous-commit off`. Veja [benchmarks/README.md](benchmarks/README.md). Cada execução grava `raw.csv`, `raw_writes.csv`, `environment.json` e `run.json` em `benchmarks/results/<UTC>-<suite>/`, sem alterar a massa de 1 M.

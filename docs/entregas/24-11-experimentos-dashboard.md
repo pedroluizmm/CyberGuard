@@ -17,6 +17,20 @@ São 6 experimentos, com **30 medições + 5 aquecimentos** por operação e por
 
 Em todas as 9 operações de leitura, o corpo da resposta foi **idêntico nos dois bancos**, verificado por hash a cada par.
 
+## Campanha de escala: 1 M × 2 M (23/11)
+
+O mesmo protocolo (mais 30 passadas de pré-aquecimento) foi medido com 1 M, **antes** da ampliação, e com 2 M, depois da validação integral (22/22) e da reconciliação do rollup. Medianas HTTP:
+
+| Operação | 1 M PG × CS | 2 M PG × CS | Vencedor |
+| --- | --- | --- | --- |
+| E1 READ por UUID | 1,64 × 1,76 ms | 1,67 × 2,38 ms | PG 1,1× → 1,4× |
+| E2/E3 páginas de 100 (Q1, Q2, Q3) | 3,9–4,9 × 8,0–11,6 ms | 4,0–4,2 × 7,7–10,6 ms | PG em todas |
+| **E4 Painel 7 dias** (244 881 → 489 346 eventos) | 90,8 × 6,12 ms | **173 × 7,93 ms** | **CS 14,8× → 21,9×** |
+| E5 view materializada / REFRESH (PG) | 1,54 / 360 ms | 1,09 / 640 ms | leitura constante, REFRESH cresce |
+| E6 CREATE padrão / antes do fsync | 10,7 × 8,79 / 4,55 × 8,17 ms | 10,3 × 7,98 / 4,60 × 7,85 ms | sem efeito do volume |
+
+No banco (`Server-Timing`), o painel de 7 dias do PostgreSQL foi de 88 para 171 ms, e o do Cassandra ficou em ~3 ms. Uma réplica em 2 M variou até 40% nas medianas HTTP; por isso, só o crescimento da agregação do PostgreSQL é atribuído ao volume. Detalhes, tempos no banco e interpretação em [../benchmark-methodology.md](../benchmark-methodology.md#campanha-de-escala-1-m--massa-ampliada).
+
 ## Cenário favorável ao NoSQL (exigido)
 
 **Painel do SOC: eventos por hora, categoria e severidade em um período.**
@@ -48,11 +62,13 @@ O ganho se deve à modelagem orientada a consultas e à escrita barata que torna
 | Dados reais | Toda visualização vem de consulta à API. Os benchmarks vêm de `summary.json` medido. Sem dados fixos ou simulados |
 | Estados | Carregando (mantém a tela anterior esmaecida), vazio, erro de filtro, banco indisponível (banner e indicador de saúde) e API inacessível, todos testados parando a API e cada banco |
 | Demonstração do ganho NoSQL | Seção **Comparação** · "Painel agregado", com os filtros atuais |
+| Benchmarks por cenário | Seletor: histórico de 1 M, cada volume da campanha de escala e comparação entre volumes (pequenos múltiplos, tabela com variação e razão, réplicas, E5 e E6) |
+| Massa conferida ao vivo | Botão **Conferir massa nos dois bancos**: soma dos painéis semanais em cada fonte |
 
 ## Limitações
 
 - **Um nó Cassandra:** a escalabilidade horizontal e a tolerância a falhas não foram demonstradas.
-- **Massa sintética** de 1 M de eventos (o recomendado era 5 M).
+- **Massa sintética** de 2 M de eventos validados (o recomendado era 5 M; a ampliação parou por energia, com hardware ainda com margem).
 - **Somente cache quente.**
 - **Recursos assimétricos e compartilhados** na mesma máquina.
 - **Rollup baseado em contadores não idempotentes,** dependente de reconciliação após falhas parciais.

@@ -4,8 +4,9 @@
     set CHROME=C:\\path\\to\\chrome.exe               # optional: explicit browser
 
 No network access and no new dependencies: the deck is self-contained and uses local
-Windows fonts (Bahnschrift, Segoe UI), which the PDF embeds. If pypdf is installed,
-the page count and the page size are checked after printing.
+Windows fonts (Bahnschrift, Segoe UI), which the PDF embeds. Before printing, the scale
+slides' data (dados-escala.js) is regenerated from benchmarks/results and data/bulk/reports
+by dados_slides.py. If pypdf is installed, the page count and the page size are checked.
 """
 import os
 from pathlib import Path
@@ -17,7 +18,7 @@ import tempfile
 HERE = Path(__file__).resolve().parent
 SOURCE = HERE / "slides.html"
 OUTPUT = HERE / "CyberGuard_Apresentacao_Final.pdf"
-EXPECTED_PAGES = 16
+EXPECTED_PAGES = 18
 CANDIDATES = [
     os.environ.get("CHROME", ""),
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -39,6 +40,9 @@ def browser() -> str:
 def main() -> None:
     if not SOURCE.is_file():
         raise SystemExit(f"FAIL: {SOURCE} missing")
+    sys.path.insert(0, str(HERE))
+    import dados_slides  # noqa: E402  (regenerate the measured numbers before printing)
+    dados_slides.main()
     with tempfile.TemporaryDirectory(prefix="cyberguard-pdf-") as profile:
         result = subprocess.run([
             browser(), "--headless=new", "--disable-gpu", "--no-pdf-header-footer", "--no-first-run",

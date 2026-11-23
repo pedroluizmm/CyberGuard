@@ -88,4 +88,14 @@ python scripts/validation/check_bulk.py --target 1000000
 
 A carga é retomável e idempotente: repetir o comando continua do checkpoint. Para recomeçar em outro ambiente, use bancos novos. Nunca apague volumes ou tabelas existentes.
 
-**Volume recomendado de 5 M:** não foi tentado. Durante a carga de 1 M, a RAM livre do host chegou a 211 MiB. A projeção para 5 M é de cerca de 6–7 GB em disco nos dois bancos e de cerca de 2,5 h por banco ([../verification-task03.md](../verification/verification-task03.md)). O mínimo exigido, 1 M, está atendido.
+## Ampliação para 2 M (23/11)
+
+A massa cresceu acrescentando os índices `[1 M, 2 M)` ao mesmo gerador (manifesto `cyberguard-bulk-v1.manifest-5000000.json`, cujo prefixo de 1 M é idêntico ao manifesto original). Carga pela API **release**, com os dois bancos em paralelo, retomando dos checkpoints de 1 M:
+
+| Incremento | PostgreSQL | Cassandra | Validação |
+| --- | --- | --- | --- |
+| 1 M → 2 M | 1 617,6 s (618 ev/s), 0 reenvios | 1 318,8 s (758 ev/s), 0 reenvios | **22/22** (`validate-2000000-20261123T201732Z.json`); rollup com 2 000 024 eventos em 10 092 células, igual ao PostgreSQL |
+
+Em 2 M: banco PostgreSQL de 1,59 GB e keyspace Cassandra de 0,66 GB (os dois dobraram); 6 164 298 linhas vivas no Cassandra (3N + A). A ampliação até 5 M parou em 2 M porque o notebook ficou na bateria (watchdog com limite de 22%); RAM, disco e CPU tinham margem ([../verification/verification-task06.md](../verification/verification-task06.md)).
+
+**Histórico (Task 03), volume recomendado de 5 M:** não foi tentado naquela tarefa. Durante a carga de 1 M, a RAM livre do host chegou a 211 MiB. A projeção para 5 M é de cerca de 6–7 GB em disco nos dois bancos e de cerca de 2,5 h por banco ([../verification-task03.md](../verification/verification-task03.md)). O mínimo exigido, 1 M, está atendido.

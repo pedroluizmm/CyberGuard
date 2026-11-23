@@ -157,7 +157,7 @@ UPDATE cyberguard.event_counts_by_day SET events = events - 1   -- deleting -> d
 WHERE event_date = ? AND hour = ? AND category = ? AND severity = ?;
 ```
 
-O custo no PostgreSQL cresce com o número de eventos do período, cerca de 245 mil entradas de índice em 7 dias. No Cassandra, cresce só com o número de dias. Entre as expressões de agrupamento medidas, `date_bin` foi a mais rápida. A semântica do contador (não idempotente, reconciliação) está em [consistency.md](consistency.md#rollup-do-painel).
+O custo no PostgreSQL cresce com o número de eventos do período: cerca de 245 mil entradas de índice em 7 dias com 1 M de eventos e 489 mil com 2 M (o tempo no banco foi de 88 para 171 ms na campanha de escala). No Cassandra, cresce só com o número de dias. Entre as expressões de agrupamento medidas, `date_bin` foi a mais rápida. A semântica do contador (não idempotente, reconciliação) está em [consistency.md](consistency.md#rollup-do-painel).
 
 ## Exemplos HTTP
 

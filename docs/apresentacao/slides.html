@@ -94,6 +94,9 @@
   .shaft::before { content: ""; flex: 1; height: 2px; background: var(--turq-bright); }
   .shaft::after { content: ""; border-left: 10px solid var(--turq-bright); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
   .arch { display: grid; grid-template-columns: 236px 96px 340px 116px 1fr; grid-template-areas: "a a1 api p1 pg" "s s1 api c1 cs"; row-gap: 22px; align-items: center; }
+  .where { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .where p { font-size: 16px; line-height: 1.45; color: var(--ink-2); border-top: 3px solid var(--turq-line); padding-top: 10px; }
+  .where b { color: var(--ink); font-weight: 650; }
   .flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; counter-reset: step; }
   .flow li { position: relative; padding: 0 0 18px 54px; counter-increment: step; }
   .flow li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 34px; height: 34px; display: grid; place-items: center; background: var(--turq-strong);
@@ -126,6 +129,9 @@
   .crow .med { font-size: 15px; color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
   .crow svg { display: block; overflow: visible; }
   .crow.e4 { background: var(--turq-soft); }
+  .crow.scale { grid-template-columns: 330px 470px 1fr; height: 40px; }
+  .crow.head.scale { height: 32px; }
+  .crow.scale .med b { color: var(--ink); }
 
   /* closing */
   .closing { background: var(--turq-strong); color: #fff; justify-content: center; padding: 72px 96px; }
@@ -260,12 +266,12 @@ partição <span class="t">ids-sensor-06 · 2026-10-27</span>
       <div>
         <h3>Caminho de escrita (LSM)</h3>
         <ol class="flow">
-          <li><b>Commit log</b><span>a escrita é acrescentada ao log em disco</span></li>
+          <li><b>Commit log</b><span>a escrita é acrescentada ao log; aqui o fsync é periódico (10 s)</span></li>
           <li><b>Memtable</b><span>gravada em memória; o cliente recebe a confirmação</span></li>
           <li><b>SSTables</b><span>a memtable cheia vira um arquivo imutável (flush)</span></li>
           <li><b>Compactação</b><span>junta arquivos e descarta versões antigas</span></li>
         </ol>
-        <p class="note" style="margin-top:4px">Não lê o dado anterior antes de escrever: por isso a escrita é barata.</p>
+        <p class="note" style="margin-top:4px">A escrita comum não lê o dado anterior: por isso é barata. A LWT (usada no nosso CREATE) lê antes, via Paxos.</p>
       </div>
     </div>
   </div>
@@ -298,7 +304,7 @@ partição <span class="t">ids-sensor-06 · 2026-10-27</span>
       <tr><td>Relações</td><td>Chaves estrangeiras e joins</td><td>Sem joins; a aplicação mantém as cópias</td></tr>
       <tr><td>Linguagem</td><td>SQL completo, agregações ad hoc</td><td>CQL: partição obrigatória na consulta</td></tr>
       <tr><td>Transações</td><td>ACID entre tabelas (MVCC)</td><td>LWT por partição; consistência ajustável</td></tr>
-      <tr><td>Índices</td><td>B-tree, parcial, de cobertura…</td><td>A chave primária é o índice</td></tr>
+      <tr><td>Índices</td><td>B-tree, parcial, de cobertura…</td><td>Chave primária (partição + clustering); SAI existe, não usado aqui</td></tr>
       <tr><td>Escrita</td><td>WAL, fsync a cada commit (padrão)</td><td>Commit log + memtable, fsync periódico</td></tr>
       <tr><td>Escala</td><td>Vertical + réplicas de leitura</td><td>Horizontal, sem mestre</td></tr>
       <tr><td>Melhor para</td><td>Integridade forte e consultas variadas</td><td>Alto volume de escrita e acesso previsível</td></tr>
@@ -323,9 +329,14 @@ partição <span class="t">ids-sensor-06 · 2026-10-27</span>
       <div class="node" style="grid-area:pg"><b><span class="key pg"></span>PostgreSQL 17</b><small>normalizado + índices B-tree</small></div>
       <div class="node" style="grid-area:cs"><b><span class="key cs"></span>Cassandra 5</b><small>tabelas por consulta + rollup</small></div>
     </div>
-    <p class="note">A mesma API atende as duas fontes: <code>/api/postgresql/…</code> e <code>/api/cassandra/…</code>. Não há escrita dupla escondida. Tudo roda em Docker Compose (WSL 2), só em 127.0.0.1.</p>
+    <div class="where">
+      <p><b>Docker Compose</b> (WSL 2): só os dois bancos, com volumes persistentes</p>
+      <p><b>Contêiner da API</b>: binário Rust iniciado por <code>scripts/run_api.py</code>, na mesma rede, fora do Compose</p>
+      <p><b>Dashboard</b>: servidor Vite no Windows, com proxy <code>/api</code> para a API</p>
+    </div>
+    <p class="note">A mesma API atende as duas fontes: <code>/api/postgresql/…</code> e <code>/api/cassandra/…</code>. Não há escrita dupla escondida. Todas as portas ficam só em 127.0.0.1.</p>
   </div>
-  <div class="foot"><span>docs/architecture.md · docker-compose.yml</span><span>CyberGuard</span></div>
+  <div class="foot"><span>docs/architecture.md · docker-compose.yml · scripts/run_api.py</span><span>CyberGuard</span></div>
 </section>
 
 <!-- 9 · Modelagem -->
@@ -362,23 +373,15 @@ alerts_by_severity_day  ((sev, dia), tempo↓)
   <div class="foot"><span>docs/data-model.md · database/postgresql · database/cassandra</span><span>CyberGuard</span></div>
 </section>
 
-<!-- 10 · Massa de dados -->
+<!-- 10 · Massa de dados (números gerados de data/bulk/reports e do resumo dos benchmarks) -->
 <section class="slide">
   <div class="tab"><span>Geração e carga</span><b>10</b></div>
-  <h2>1 milhão de eventos nos dois bancos</h2>
-  <div class="body" style="gap:34px">
-    <div class="stats">
-      <div class="stat"><div class="v">1.000.000</div><p class="k">eventos lógicos sintéticos</p><p>Seed fixa 20261109, 28 dias, 393 dispositivos, 20 campanhas de ataque e 82.443 alertas</p></div>
-      <div class="stat"><div class="v">22 / 22</div><p class="k">verificações de integridade</p><p>Conteúdo e IDs iguais ao gerador nos dois bancos; 3N + A = 3.082.443 linhas no Cassandra</p></div>
-      <div class="stat"><div class="v">9.978</div><p class="k">células no rollup do painel</p><p>Idênticas, célula a célula, à agregação SQL do PostgreSQL</p></div>
-    </div>
-    <table>
-      <tr><th style="width:420px">Carga via API (build de depuração, não é benchmark)</th><th><span class="key pg"></span>PostgreSQL</th><th><span class="key cs"></span>Cassandra</th></tr>
-      <tr><td>900 mil eventos até completar 1 M</td><td class="num">1.717 s · 524 eventos/s</td><td class="num">1.516 s · 594 eventos/s</td></tr>
-      <tr><td>Espaço principal</td><td class="num">events 696 MB · banco 797 MB</td><td class="num">canônico 260,5 MB + projeções 68,5 MB</td></tr>
-    </table>
+  <h2 id="mass-title">Massa de eventos nos dois bancos</h2>
+  <div class="body" style="gap:28px">
+    <div class="stats" id="mass-stats"></div>
+    <table id="mass-table"></table>
   </div>
-  <div class="foot"><span>data/bulk/cyberguard-bulk-v1.manifest.json · data/bulk/reports · docs/bulk-load.md</span><span>CyberGuard</span></div>
+  <div class="foot"><span>data/bulk/cyberguard-bulk-v1.manifest-5000000.json · data/bulk/reports · docs/bulk-load.md</span><span>CyberGuard</span></div>
 </section>
 
 <!-- 11 · Metodologia -->
@@ -399,10 +402,10 @@ alerts_by_severity_day  ((sev, dia), tempo↓)
       <div style="display:grid;gap:20px">
         <ul class="clean tight small">
           <li><strong>5 aquecimentos + 30 medições</strong> por operação e banco (mínimo exigido: 10)</li>
-          <li>Pares intercalados, com ordem alternada</li>
-          <li><strong>Mediana</strong> como valor principal; tempos brutos guardados</li>
+          <li>Pares intercalados, com ordem alternada; <strong>mediana</strong> e tempos brutos guardados</li>
           <li>Resposta <strong>idêntica</strong> exigida nos dois bancos</li>
           <li>PostgreSQL com todos os índices e <code>VACUUM ANALYZE</code></li>
+          <li><strong>Escala:</strong> mesmo código, parâmetros e protocolo em cada volume, com 30 passadas de pré-aquecimento descartadas</li>
         </ul>
         <div class="box" style="padding:16px 20px"><p style="font-size:16px"><strong>Ambiente:</strong> Intel Core Ultra 7 155H, 15,4 GiB · Docker (WSL 2) · PostgreSQL 17.11 com 2 GiB · Cassandra 5.0.9 com 5 GiB, 1 nó · cache quente · API release</p></div>
       </div>
@@ -413,8 +416,8 @@ alerts_by_severity_day  ((sev, dia), tempo↓)
 
 <!-- 12 · Resultados -->
 <section class="slide">
-  <div class="tab"><span>Resultados</span><b>12</b></div>
-  <h2>Cada banco vence onde foi modelado</h2>
+  <div class="tab"><span>Resultados · 1 M</span><b>12</b></div>
+  <h2>Com 1 milhão: cada banco vence onde foi modelado</h2>
   <div class="body" style="justify-content:flex-start;margin-top:22px;gap:14px">
     <div class="chart" id="results"></div>
     <p style="font-size:15px;color:var(--ink-2)">Barras em escala logarítmica: quantas vezes o mais rápido superou o outro (mediana HTTP de 30 execuções). Resposta idêntica em 9 de 9 operações; o mesmo vencedor em 30 de 30 pares.</p>
@@ -422,9 +425,31 @@ alerts_by_severity_day  ((sev, dia), tempo↓)
   <div class="foot"><span>benchmarks/results/20261115T053008Z-main</span><span>CyberGuard</span></div>
 </section>
 
-<!-- 13 · Análise crítica -->
+<!-- 13 · Escala: 1 M × maior volume (gerado de benchmarks/results/summary.json, campanha "escala") -->
 <section class="slide">
-  <div class="tab"><span>Análise crítica</span><b>13</b></div>
+  <div class="tab"><span>Resultados · escala</span><b>13</b></div>
+  <h2 id="scale-title">O que muda quando a massa cresce</h2>
+  <div class="body" style="justify-content:flex-start;margin-top:18px;gap:12px">
+    <div class="chart" id="scale"></div>
+    <p id="scale-note" style="font-size:14.5px;color:var(--ink-2)"></p>
+  </div>
+  <div class="foot"><span id="scale-foot">benchmarks/results · campanha de escala</span><span>CyberGuard</span></div>
+</section>
+
+<!-- 14 · Por que cada banco reagiu assim -->
+<section class="slide">
+  <div class="tab"><span>Análise · escala</span><b>14</b></div>
+  <h2>Por que cada banco reagiu assim</h2>
+  <div class="body">
+    <div class="cols3" style="gap:36px" id="why"></div>
+    <p class="note" id="why-note"></p>
+  </div>
+  <div class="foot"><span>docs/benchmark-methodology.md · benchmarks/results</span><span>CyberGuard</span></div>
+</section>
+
+<!-- 15 · Análise crítica -->
+<section class="slide">
+  <div class="tab"><span>Análise crítica</span><b>15</b></div>
   <h2>Vantagens, limites e trade-offs</h2>
   <div class="body">
     <div class="cols3" style="gap:36px">
@@ -435,7 +460,7 @@ alerts_by_severity_day  ((sev, dia), tempo↓)
       <div><h3>Busca e escrita: PostgreSQL</h3><ul class="clean small tight">
         <li>A B-tree entrega a página completa em uma consulta</li>
         <li>No Cassandra, cada resultado exige uma leitura do registro canônico</li>
-        <li>Com o mesmo fsync, CREATE: <strong>PostgreSQL&nbsp;5,8&nbsp;ms</strong> × Cassandra&nbsp;9,5&nbsp;ms</li></ul></div>
+        <li>Com os dois confirmando antes do fsync, CREATE: <strong>PostgreSQL&nbsp;5,8&nbsp;ms</strong> × Cassandra&nbsp;9,5&nbsp;ms (janelas de perda ainda diferentes)</li></ul></div>
       <div><h3>Controle e limites</h3><ul class="clean small tight">
         <li>E5: view materializada lê em 1,15 ms, mas o REFRESH completo leva 282 ms</li>
         <li>Contadores não são idempotentes e exigem reconciliação</li>
@@ -446,9 +471,9 @@ alerts_by_severity_day  ((sev, dia), tempo↓)
   <div class="foot"><span>benchmarks/results: …053008Z-main · …202129Z-writes · …202202Z-durability</span><span>CyberGuard</span></div>
 </section>
 
-<!-- 14 · Dashboard -->
+<!-- 16 · Dashboard -->
 <section class="slide">
-  <div class="tab"><span>Dashboard</span><b>14</b></div>
+  <div class="tab"><span>Dashboard</span><b>16</b></div>
   <h2>Dashboard desenvolvido</h2>
   <div class="body" style="margin-top:22px">
     <div style="display:grid;grid-template-columns:400px 1fr;gap:40px;align-items:center">
@@ -458,26 +483,27 @@ alerts_by_severity_day  ((sev, dia), tempo↓)
         <li><strong>Seletor PostgreSQL / Cassandra</strong> com tempo em ms</li>
         <li><strong>Investigação</strong> Q1–Q3 com paginação e detalhe do evento</li>
         <li><strong>Comparação ao vivo</strong> com verificação de resultado idêntico</li>
-        <li><strong>Benchmarks</strong> medidos (E1–E6)</li>
+        <li><strong>Benchmarks</strong> gravados: 1 M histórico, cada volume e comparação entre volumes</li>
+        <li><strong>Massa conferida ao vivo</strong> nos dois bancos</li>
       </ul>
       <figure style="margin:0">
-        <img src="img/dashboard-visao-geral.png" alt="Visão geral do dashboard CyberGuard consultando o Cassandra: 244.881 eventos de 26/10 a 01/11/2026" style="width:100%;display:block;border:1px solid var(--line);box-shadow:0 14px 36px rgba(16,18,23,.18)">
-        <figcaption style="font-size:13.5px;color:var(--ink-2);margin-top:10px">Captura real · Visão geral consultando o Cassandra, semana de 26/10 a 01/11/2026</figcaption>
+        <img src="img/dashboard-visao-geral.png" alt="Visão geral do dashboard CyberGuard consultando o Cassandra com a massa de 2 milhões: 489.346 eventos de 26/10 a 01/11/2026" style="width:100%;display:block;border:1px solid var(--line);box-shadow:0 14px 36px rgba(16,18,23,.18)">
+        <figcaption style="font-size:13.5px;color:var(--ink-2);margin-top:10px">Captura real (23/11, massa de 2 M) · Visão geral consultando o Cassandra, semana de 26/10 a 01/11/2026</figcaption>
       </figure>
     </div>
   </div>
   <div class="foot"><span>Demonstração ao vivo: docs/apresentacao/roteiro-demo.md</span><span>CyberGuard</span></div>
 </section>
 
-<!-- 15 · Conclusões -->
+<!-- 17 · Conclusões -->
 <section class="slide">
-  <div class="tab"><span>Conclusões</span><b>15</b></div>
+  <div class="tab"><span>Conclusões</span><b>17</b></div>
   <h2>O que aprendemos</h2>
   <div class="body">
     <div class="steps" style="grid-template-columns:repeat(2,1fr);gap:30px 56px">
-      <div class="step"><div class="n">01</div><p style="font-size:19.5px;margin-top:10px"><strong>Modelar pela consulta</strong> é a força do Cassandra: o painel pré-agregado foi de 7,1× a 21,9× mais rápido.</p></div>
-      <div class="step"><div class="n">02</div><p style="font-size:19.5px;margin-top:10px">O <strong>PostgreSQL</strong> venceu as buscas por chave (1,2× a 4,0×) e as escritas com a mesma política de fsync.</p></div>
-      <div class="step"><div class="n">03</div><p style="font-size:19.5px;margin-top:10px">A vantagem <strong>depende da pergunta</strong>: pré-agregado, o PostgreSQL também lê rápido, mas precisa de REFRESH.</p></div>
+      <div class="step"><div class="n">01</div><p style="font-size:19.5px;margin-top:10px" id="concl-1"><strong>Modelar pela consulta</strong> é a força do Cassandra: com 1 M, o painel pré-agregado foi de 7,1× a 21,9× mais rápido.</p></div>
+      <div class="step"><div class="n">02</div><p style="font-size:19.5px;margin-top:10px" id="concl-2">O <strong>PostgreSQL</strong> venceu as buscas por chave (1,2× a 4,0×) e as escritas quando os dois confirmam antes do fsync.</p></div>
+      <div class="step"><div class="n">03</div><p style="font-size:19.5px;margin-top:10px" id="concl-3">A vantagem <strong>depende da pergunta</strong>: pré-agregado, o PostgreSQL também lê rápido, mas precisa de REFRESH.</p></div>
       <div class="step"><div class="n">04</div><p style="font-size:19.5px;margin-top:10px">Escala horizontal e tolerância a falhas <strong>não foram medidas</strong>: o ambiente tem um único nó.</p></div>
     </div>
     <p class="note" style="font-size:19px">Escolher o banco pelo padrão de acesso, pela consistência exigida e pelo crescimento esperado, e não pela ideia de que “NoSQL é mais rápido”.</p>
@@ -485,16 +511,17 @@ alerts_by_severity_day  ((sev, dia), tempo↓)
   <div class="foot"><span>README.md · docs/benchmark-methodology.md</span><span>CyberGuard</span></div>
 </section>
 
-<!-- 16 · Encerramento -->
+<!-- 18 · Encerramento -->
 <section class="slide closing">
   <h1>Obrigado</h1>
   <p class="sub">Perguntas?</p>
-  <p class="sum"><strong>CyberGuard</strong> · o mesmo milhão de eventos em Cassandra e PostgreSQL. Cassandra vence o painel pré-agregado; PostgreSQL vence as buscas por chave. Código, modelos, scripts, resultados brutos e evidências da massa estão no repositório.</p>
+  <p class="sum" id="closing-sum"><strong>CyberGuard</strong> · os mesmos eventos em Cassandra e PostgreSQL. Cassandra vence o painel pré-agregado; PostgreSQL vence as buscas por chave. Código, modelos, scripts, resultados brutos e evidências da massa estão no repositório <strong>github.com/pedroluizmm/CyberGuard</strong>.</p>
   <p style="margin-top:28px;font-size:18px;color:#f1fbfc">Pedro Luiz e Paulo Henrico · UNIFOR · Banco de Dados NoSQL</p>
 </section>
 
 </div>
 <div id="counter" aria-live="polite"></div>
+<script src="dados-escala.js"></script>
 <script>
   // ---- cover art: abstract partitions (no data) ----
   (function () {
@@ -553,6 +580,115 @@ alerts_by_severity_day  ((sev, dia), tempo↓)
       [1, ...ticks].flatMap((t) => (t === 1 ? [[half, '1×']] : [[half - len(t), `${t}×`], [half + len(t), `${t}×`]])).map(([x, s]) => `<text x="${x}" y="17" text-anchor="middle" font-size="13" fill="#5a636e" font-family="Segoe UI">${s}</text>`).join('')
     }</svg><span></span></div>`
     el.innerHTML = head + rows + axis
+  })()
+
+  // ---- scale campaign slides (10, 13, 14): every number comes from dados-escala.js ----
+  ;(function () {
+    const E = window.ESCALA
+    const nf = (v, d = 0) => Number(Number(v).toFixed(d)).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d })
+    const ms = (v) => v == null ? '—' : `${nf(v, v < 10 ? 2 : v < 100 ? 1 : 0)} ms`
+    const ratio = (v) => v == null ? '—' : `${nf(v, 1)}×`
+    const mi = (n) => `${nf(n / 1e6, n % 1e6 ? 1 : 0)} M`
+    const bytes = (b) => b == null ? '—' : b >= 1e9 ? `${nf(b / 1e9, 2)} GB` : `${nf(b / 1e6, 0)} MB`
+    const delta = (a, b) => (a && b != null) ? `${b >= a ? '+' : '−'}${nf(Math.abs(100 * (b - a) / a), Math.abs(100 * (b - a) / a) < 10 ? 1 : 0)}%` : '—'
+    const who = { postgresql: 'PG', cassandra: 'CS' }
+    if (!E || !E.sizes || !E.sizes.length) return
+    const sizes = E.sizes, lo = sizes[0]
+    const valid = sizes.filter((n) => E.validations[n] && E.validations[n].passed === E.validations[n].total)
+    const hi = valid.length ? Math.max(...valid) : sizes[sizes.length - 1]
+    const at = (op, n) => op.points.find((p) => p.n === n)
+    const op = (id) => E.ops.find((o) => o.id === id)
+
+    // slide 10: volume, integrity, loads and storage
+    const v = E.validations[hi] || {}
+    const roll = [...E.rollups].reverse().find((r) => r.events >= hi)
+    document.getElementById('mass-title').textContent = `${nf(hi / 1e6)} ${hi === 1e6 ? 'milhão' : 'milhões'} de eventos nos dois bancos`
+    document.getElementById('mass-stats').innerHTML = `
+      <div class="stat"><div class="v">${nf(hi)}</div><p class="k">eventos lógicos em cada banco</p><p>Seed fixa 20261109: de 1 M a ${mi(hi)} só foram acrescentados índices novos ao mesmo gerador; nada foi apagado</p></div>
+      <div class="stat"><div class="v">${v.passed ?? '—'} / ${v.total ?? '—'}</div><p class="k">verificações em ${mi(hi)}</p><p>Conteúdo integral e IDs iguais ao gerador nos dois bancos, projeções, partições, READs e Q1–Q3</p></div>
+      <div class="stat"><div class="v">${roll ? nf(roll.cells) : '—'}</div><p class="k">células no rollup do painel</p><p>${roll ? `Iguais à agregação SQL do PostgreSQL (${nf(roll.events)} eventos, ${roll.deltas} diferenças)` : 'Reconciliação pendente'}</p></div>`
+    const steps = []
+    const byKey = {}
+    for (const l of E.loads) { const k = `${l.source}|${l.target}`; byKey[k] = byKey[k] || { created: 0, seconds: 0 }; byKey[k].created += l.created; byKey[k].seconds += l.seconds }
+    const targets = [...new Set(E.loads.map((l) => l.target))].filter((t) => t <= hi).sort((a, b) => a - b)
+    for (const t of targets) {
+      const prev = targets.filter((x) => x < t).pop() || (t === 1e6 ? 0 : 1e6)
+      const cell = (s) => { const r = byKey[`${s}|${t}`]; return r && r.seconds ? `${nf(r.seconds / 60, 0)} min · ${nf(r.created / r.seconds)} ev/s` : '—' }
+      const build = E.loads.find((l) => l.target === t)?.build
+      const how = build === 'release' ? 'release, bancos em paralelo' : 'depuração, um banco por vez'
+      steps.push(`<tr><td>${prev ? mi(prev) : '0'} → ${mi(t)} <span style="font-weight:400;color:var(--ink-2);font-size:15px">(${how})</span></td><td class="num">${cell('postgresql')}</td><td class="num">${cell('cassandra')}</td></tr>`)
+    }
+    const st = (n) => E.storage.find((s) => s.n === n) || {}
+    document.getElementById('mass-table').innerHTML = `
+      <tr><th style="width:420px">Carga via API (não é benchmark)</th><th><span class="key pg"></span>PostgreSQL</th><th><span class="key cs"></span>Cassandra</th></tr>
+      ${steps.join('')}
+      <tr><td>Espaço ${mi(lo)} → ${mi(hi)}</td><td class="num">banco ${bytes(st(lo).pg_database_bytes)} → ${bytes(st(hi).pg_database_bytes)}</td><td class="num">keyspace ${bytes(st(lo).cs_keyspace_bytes)} → ${bytes(st(hi).cs_keyspace_bytes)}</td></tr>`
+
+    // slide 13: growth factor of each median from the smallest to the largest validated size (log bars)
+    document.getElementById('scale-title').textContent = `${mi(lo)} × ${mi(hi)}: o que muda com a massa`
+    const W = 470, half = W / 2, maxLog = Math.log10(8)
+    const len = (f) => Math.min(half - 46, (Math.abs(Math.log10(f)) / maxLog) * (half - 46))
+    const bar = (f, y, color) => {
+      const l = len(f), right = f >= 1, x = right ? half : half - l
+      const tx = right ? half + l + 6 : half - l - 6
+      return `<rect x="${x}" y="${y}" width="${Math.max(l, 1.5)}" height="9" fill="${color}"/><text x="${tx}" y="${y + 8.5}" text-anchor="${right ? 'start' : 'end'}" font-size="12.5" font-weight="650" fill="#2b3036" font-family="Segoe UI">×${nf(f, f < 10 ? 2 : 1)}</text>`
+    }
+    const head = `<div class="crow head scale"><span>Operação</span><span style="display:flex;justify-content:space-between;padding:0 4px"><span>← ficou mais rápido</span><span>mediana ${mi(hi)} ÷ ${mi(lo)}</span><span>mais lento →</span></span><span style="text-align:right">Vencedor ${mi(lo)} → ${mi(hi)}</span></div>`
+    const rows = E.ops.map((o) => {
+      const a = at(o, lo), b = at(o, hi)
+      if (!a || !b) return ''
+      const fp = b.pg / a.pg, fc = b.cs / a.cs
+      const grid = [0.5, 2, 4].map((t) => { const x = t >= 1 ? half + len(t) : half - len(t); return `<line x1="${x}" x2="${x}" y1="-19" y2="19" stroke="#e7ecef"/>` }).join('')
+      return `<div class="crow scale ${o.exp === 'E4' ? 'e4' : ''}"><span class="lab"><i>${o.exp}</i>${o.label}</span>
+        <svg width="${W}" height="40" viewBox="0 -20 ${W} 40">${grid}<line x1="${half}" x2="${half}" y1="-20" y2="20" stroke="#2b3036" stroke-width="1.5"/>${bar(fp, -12, 'var(--pg)')}${bar(fc, 2, 'var(--cs)')}</svg>
+        <span class="med">${who[a.faster]} ${ratio(a.ratio)} → <b>${who[b.faster]} ${ratio(b.ratio)}</b></span></div>`
+    }).join('')
+    const axis = `<div class="crow scale" style="height:24px;border:0"><span></span><svg width="${W}" height="24" viewBox="0 0 ${W} 24">${
+      [[0.5, '×0,5'], [1, '×1'], [2, '×2'], [4, '×4']].map(([t, s]) => `<text x="${t >= 1 ? half + (t === 1 ? 0 : len(t)) : half - len(t)}" y="16" text-anchor="middle" font-size="12" fill="#5a636e" font-family="Segoe UI">${s}</text>`).join('')
+    }</svg><span></span></div>`
+    document.getElementById('scale').innerHTML = head + rows + axis
+    const all = E.ops.every((o) => o.points.every((p) => p.equivalent))
+    const noise = Math.max(0, ...E.ops.flatMap((o) => { const b = at(o, hi); return b ? (b.replicates || []).flatMap((r) => [Math.abs(r.postgresql / b.pg - 1), Math.abs(r.cassandra / b.cs - 1)]) : [] }))
+    document.getElementById('scale-note').innerHTML = `<span class="key pg" style="width:10px;height:10px"></span>PostgreSQL <span class="key cs" style="width:10px;height:10px;margin-left:14px"></span>Cassandra · barras em escala log: mediana HTTP em ${mi(hi)} ÷ mediana em ${mi(lo)} (30 execuções cada, mesmo protocolo). ${noise ? `<strong>Uma réplica em ${mi(hi)} variou até ${nf(100 * noise)}%: variações menores não podem ser atribuídas ao volume.</strong> ` : ''}${all ? 'Resposta idêntica nos dois bancos em todas as operações e volumes.' : 'Atenção: há operação com resposta divergente.'}`
+    document.getElementById('scale-foot').textContent = `benchmarks/results: ${E.runs[lo] ? E.runs[lo].main : ''} (${mi(lo)}) · ${E.runs[hi] ? E.runs[hi].main : ''} (${mi(hi)})`
+
+    // slide 14: mechanisms, with the measured numbers that support them
+    const p7 = op('overview_7d'), a7 = p7 && at(p7, lo), b7 = p7 && at(p7, hi)
+    const c = (n) => E.control.find((x) => x.n === n || x.logical_events === n) || {}
+    const keyed = E.ops.filter((o) => o.class === 'chave' || o.class === 'pagina_fixa')
+    const span = (src) => { const d = keyed.map((o) => { const a = at(o, lo), b = at(o, hi); return a && b ? 100 * (b[src] - a[src]) / a[src] : null }).filter((x) => x != null); return d.length ? `${delta(100, 100 + Math.min(...d))} a ${delta(100, 100 + Math.max(...d))}` : '—' }
+    const w = (n, cfg) => E.writes.find((x) => x.logical_events === n && x.config === cfg)
+    const wl = w(lo, 'padrao'), wh = w(hi, 'padrao'), fl = w(lo, 'antes_do_fsync'), fh = w(hi, 'antes_do_fsync')
+    const changed = keyed.filter((o) => { const a = at(o, lo), b = at(o, hi); return a && b && a.faster !== b.faster }).map((o) => o.label)
+    const sameWinner = changed.length === 0
+    const pgCreate = (x) => x && x.create.postgresql.median_ms
+    const durabilityDominates = wh && fh && wl && Math.abs(pgCreate(wh) - pgCreate(fh)) > Math.abs(pgCreate(wh) - pgCreate(wl))
+    const cache = (n) => (E.cache || []).find((x) => x.n === n) || {}
+    const growPg = a7 && b7 ? b7.pg_db / a7.pg_db : 1, growCs = a7 && b7 ? b7.cs_db / a7.cs_db : 1
+    const aggTitle = growPg > 1.5 && growCs < 1.25 ? 'Agregação: PG cresce, rollup não' : 'Agregação (E4/E5)'
+    const share = (r) => r == null ? '—' : `${nf(100 * r, 1)}%`
+    document.getElementById('why').innerHTML = `
+      <div><h3>${aggTitle}</h3><ul class="clean small tight">
+        <li>Painel 7 dias, tempo no banco do PG: <strong>${ms(a7 && a7.pg_db)} → ${ms(b7 && b7.pg_db)}</strong>, agregando ${a7 ? nf(a7.covered) : '—'} → ${b7 ? nf(b7.covered) : '—'} eventos</li>
+        <li>No Cassandra: <strong>${ms(a7 && a7.cs_db)} → ${ms(b7 && b7.cs_db)}</strong>; lê as mesmas ≤ 2.520 células de contador</li>
+        <li>E5: view materializada ${ms(c(lo).pg_mv_read_7d)} → ${ms(c(hi).pg_mv_read_7d)}, mas o REFRESH vai de ${ms(c(lo).pg_mv_refresh_full)} a ${ms(c(hi).pg_mv_refresh_full)}</li></ul></div>
+      <div><h3>Chave e página fixa</h3><ul class="clean small tight">
+        <li>Variação em E1–E3: PG <strong>${span('pg')}</strong>; Cassandra <strong>${span('cs')}</strong>, dentro da variação entre execuções (até ${nf(100 * noise)}%)</li>
+        <li>B-tree e partição + clustering localizam a chave sem varrer a massa; ${sameWinner ? 'o vencedor não mudou em nenhuma delas' : `o vencedor mudou em ${changed.join(', ')}`}</li>
+        <li>Cresce o volume que precisa caber em cache: acertos na fase de leitura PG ${share(cache(lo).pg)} → ${share(cache(hi).pg)}, Cassandra ${share(cache(lo).cs)} → ${share(cache(hi).cs)}</li></ul></div>
+      <div><h3>Escritas (E6)</h3><ul class="clean small tight">
+        <li>CREATE padrão: PG ${ms(wl && wl.create.postgresql.median_ms)} → ${ms(wh && wh.create.postgresql.median_ms)}; Cassandra ${ms(wl && wl.create.cassandra.median_ms)} → ${ms(wh && wh.create.cassandra.median_ms)}</li>
+        <li>Confirmando antes do fsync: PG ${ms(fl && fl.create.postgresql.median_ms)} → ${ms(fh && fh.create.postgresql.median_ms)}; Cassandra ${ms(fl && fl.create.cassandra.median_ms)} → ${ms(fh && fh.create.cassandra.median_ms)}</li>
+        <li>${durabilityDominates ? 'No PostgreSQL, trocar a política de fsync muda o CREATE mais do que multiplicar a massa' : 'A massa maior pesou no CREATE tanto quanto a política de fsync'}; as janelas de perda seguem diferentes (~0,6 s × até 10 s)</li></ul></div>`
+    // slides 17-18: conclusions and closing use the largest validated size
+    if (a7 && b7) {
+      document.getElementById('concl-1').innerHTML = `<strong>Modelar pela consulta</strong> é a força do Cassandra: o painel de 7 dias foi ${ratio(a7.ratio)} mais rápido em ${mi(lo)} e ${ratio(b7.ratio)} em ${mi(hi)}, porque só o PostgreSQL agrega mais eventos quando a massa cresce.`
+      document.getElementById('concl-3').innerHTML = `A vantagem <strong>depende da pergunta</strong>: pré-agregado, o PostgreSQL também lê rápido (${ms(c(hi).pg_mv_read_7d)} em ${mi(hi)}), mas cada REFRESH completo custa ${ms(c(hi).pg_mv_refresh_full)}.`
+    }
+    const keyedHi = keyed.map((o) => at(o, hi)).filter((p) => p && p.faster === 'postgresql').map((p) => p.ratio)
+    if (keyedHi.length) document.getElementById('concl-2').innerHTML = `O <strong>PostgreSQL</strong> venceu as buscas por chave nos dois volumes (${ratio(Math.min(...keyedHi))} a ${ratio(Math.max(...keyedHi))} em ${mi(hi)}) e as escritas quando os dois confirmam antes do fsync.`
+    document.getElementById('closing-sum').innerHTML = `<strong>CyberGuard</strong> · os mesmos ${nf(hi)} eventos em Cassandra e PostgreSQL. Cassandra vence o painel pré-agregado; PostgreSQL vence as buscas por chave. Código, modelos, scripts, resultados brutos e evidências da massa estão no repositório <strong>github.com/pedroluizmm/CyberGuard</strong>.`
+    document.getElementById('why-note').innerHTML = `<strong>Um nó, uma máquina:</strong> crescer de ${mi(lo)} para ${mi(hi)} eventos mostra como cada modelagem reage ao volume, não escalabilidade horizontal, replicação ou tolerância a falhas.`
   })()
 
   // ---- navigation ----

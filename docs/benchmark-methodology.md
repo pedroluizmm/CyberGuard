@@ -1,5 +1,7 @@
 # Experimentos comparativos: metodologia e resultados (Task 04)
 
+> **Duas campanhas, sem mistura de números.** As seções abaixo descrevem a campanha **histórica** de 1 M (15/11, Task 04), preservada sem alteração. A **campanha de escala** (23/11, Task 06) mediu 1 M de novo e depois volumes maiores com o mesmo código e o mesmo protocolo (mais um pré-aquecimento): veja [Campanha de escala](#campanha-de-escala-1-m--massa-ampliada). Os valores absolutos de 1 M diferem entre as duas campanhas porque o estado do host mudou (por exemplo, notebook na bateria em 23/11); compare volumes **dentro** da mesma campanha.
+
 Todos os números deste documento vêm dos arquivos em `benchmarks/results/`. A execução principal citada é `20261115T053008Z-main` (E1–E5). O E6 vem das execuções corrigidas `20261115T202129Z-writes` e `20261115T202202Z-durability` (ver [E6](#e6-escritas-crud-concorrentes)). A execução `20261115T052908Z-n1` é a variante do N+1. As execuções anteriores (`…052604Z-main`, `…052947Z-durability`, `…202031Z-writes`) ficam preservadas como réplica e como registro das correções do protocolo de escrita. Para reproduzir, veja [Reproduzir](#reproduzir).
 
 ## Pergunta e hipóteses
@@ -167,6 +169,99 @@ Correções: o pool passou a ser configurável (`POSTGRES_POOL_SIZE`, padrão 16
 - **Cliente sequencial** nas leituras. Não houve teste de throughput de leitura sob concorrência.
 - **Aquecimento da JVM.** O Cassandra recém-reiniciado leva várias centenas de operações para estabilizar. As leituras usam 5 aquecimentos por operação; o E6, 2 rodadas.
 - **Hipóteses não medidas:** contenção de uma tabela-resumo do PostgreSQL mantida por gatilho e `REFRESH MATERIALIZED VIEW CONCURRENTLY`.
+
+## Campanha de escala: 1 M × massa ampliada
+
+**Pergunta (23/11):** como a comparação acima muda quando a massa cresce, sem mudar mais nada?
+
+### Desenho
+
+- **Mesma máquina e mesma configuração** em todos os volumes: limites de 5 GiB (Cassandra) e 2 GiB (PostgreSQL), as mesmas imagens, o mesmo binário release da API (pool 16, concorrência de leitura 32) e o mesmo código do executor. A configuração dos bancos **não** foi ajustada ao volume, para isolar o efeito da massa.
+- **Baseline de 1 M medido antes de qualquer ampliação** (`20261123T193439Z-main` e `20261123T193718Z-durability`). Depois que a massa cresce, uma consulta restrita aos eventos antigos **não** substitui esse baseline.
+- **Mesmos parâmetros:** os mesmos dispositivos, IPs, severidades e janelas fixas do histórico. No E1, os UUIDs são amostrados de todo o prefixo carregado `[0, N)` pela mesma fórmula (em 1 M, a lista é exatamente a do histórico).
+- **Mesmo protocolo:** 5 aquecimentos + 30 medições por operação e banco, pares intercalados com ordem alternada, resposta idêntica exigida, mais **30 passadas de pré-aquecimento** descartadas (ver abaixo). Antes de cada volume: `check_bulk.py`, `reconcile_rollup.py`, `VACUUM (ANALYZE)` e 0 compactações pendentes no Cassandra (sem compactação forçada). Tudo isso é a sequência de `benchmarks/run_scale_point.py`.
+- **O E6 da campanha** roda dentro da suíte `main` (pool 16 ≥ 8 clientes, 2 rodadas de aquecimento) e, com a API reiniciada com `synchronous_commit=off`, na suíte `durability`.
+
+**Controles gravados em cada execução**, para que a variação possa ser atribuída:
+
+| Controle | Para quê |
+| --- | --- |
+| Volume medido nos dois bancos (soma dos painéis semanais) | O executor recusa medir se os totais forem diferentes |
+| Eventos cobertos por consulta (`workload`, contagem no PostgreSQL) | Mostra que os eventos novos entram no trabalho medido: o painel de 7 dias cobre 244 881 eventos em 1 M |
+| Acertos de cache e bytes lidos do disco na fase de leitura | Separa efeito de volume de efeito de cache (PG `shared_buffers`, *key cache* do Cassandra, `BlockIO` dos contêineres) |
+| Compactações pendentes, energia do notebook, RAM do host | Condições do host que mudam valores absolutos |
+
+**Três tipos de operação:**
+
+1. **Período fixo e resposta de tamanho controlado:** E1 (1 evento por chave) e as páginas de E2/E3 (100 ou 1 000 eventos). O intervalo indexado cresce; a resposta, não.
+2. **Trabalho que cresce com a massa:** o painel E4 no PostgreSQL agrega todos os eventos do período; o E5 "agregação na leitura" e o REFRESH da view crescem com a tabela; o "Q1 dispositivo pouco ativo" devolve mais eventos (54 em 1 M) até o limite de 100 por página.
+3. **Pré-agregação que evita o crescimento na leitura:** o rollup do Cassandra (E4) lê no máximo 7 × 360 células; a view materializada do E5 lê as mesmas células horárias.
+
+### Mudança de protocolo: pré-aquecimento
+
+A primeira execução de 1 M (`20261123T193215Z-main`, preservada como **piloto**) rodou 12 minutos depois de o Docker ser reiniciado. Dentro dela, o painel de 7 dias no Cassandra caiu de 10,8 ms (mediana do 1º terço) para 8,4 ms (último terço): a JVM ainda aquecia. Medir 1 M com a JVM fria e os volumes maiores com a JVM aquecida por horas de carga favoreceria artificialmente o Cassandra na comparação. Por isso, **todas** as execuções oficiais da campanha fazem 30 passadas completas de pré-aquecimento antes dos 5 aquecimentos, gravadas em `raw.csv` como `phase=prewarm` e excluídas das estatísticas. No E1, essas passadas usam UUIDs que nunca são medidos. O `summary.json` ignora execuções `main` de campanha sem pré-aquecimento e lista o piloto em `pilots`.
+
+### Volumes medidos
+
+| Volume | Validação | Rollup | Execuções | Energia |
+| --- | --- | --- | --- | --- |
+| 1 M | 22/22 (`validate-1000000-20261123T192730Z.json`) | 0 diferenças, 9 978 células (`rollup-check-20261123T192828Z.json`) | `20261123T193439Z-main`, `…193718Z-durability` (piloto `…193215Z-main`) | bateria 62% |
+| 2 M | 22/22 (`validate-2000000-20261123T201732Z.json`) | 0 diferenças, 10 092 células, 2 000 024 eventos (`rollup-check-20261123T201826Z.json`) | `20261123T201831Z-main`, `…202000Z-durability`, réplica `…202101Z-main` (só leituras e E5) | bateria 26% (réplica 23%) |
+
+**2 M é o maior volume carregado e validado.** A ampliação parou por **energia**, não por limite de hardware: o notebook ficou na bateria a tarde toda (62% → 21%), e o watchdog impediu novas cargas abaixo de 22%. Com a massa de 2 M, a VM manteve ≥ 2,78 GiB livres, swap ≤ 28 MiB, disco ≥ 157 GiB livres e nenhum contêiner perto de OOM (detalhes em [verification-task06.md](verification/verification-task06.md)). As duas execuções oficiais rodaram na bateria, acima dos 20% em que o Windows ativa a economia de energia, com o mesmo plano ("Equilibrado").
+
+### Resultados: mediana HTTP (ms), 30 execuções por banco e volume
+
+| Operação | Classe | Eventos cobertos 1 M → 2 M | PG 1 M | CS 1 M | PG 2 M | CS 2 M | Δ PG | Δ CS | Vencedor 1 M → 2 M |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| E1 READ por UUID | chave | 1 evento | 1,64 | 1,76 | 1,67 | 2,38 | +2,1% | +35% | PG 1,1× → PG 1,4× |
+| E2 Q1 dispositivo quente, 1ª página | página fixa | 13 478 → 27 136 | 3,88 | 8,53 | 4,15 | 8,21 | +7,0% | −3,8% | PG 2,2× → PG 2,0× |
+| E2 Q1 10 páginas (1 000 eventos) | página fixa | 13 478 → 27 136 | 32,3 | 95,0 | 31,7 | 90,4 | −1,7% | −4,8% | PG 2,9× → PG 2,9× |
+| E2 Q1 dispositivo pouco ativo | resposta cresce | 54 → 113 | 3,08 | 11,3 | 3,70 | 13,0 | +20% | +15% | PG 3,7× → PG 3,5× |
+| E3 Q2 IP de campanha, 1ª página | página fixa | 11 522 → 23 124 | 4,85 | 11,6 | 3,97 | 10,6 | −18% | −9,1% | PG 2,4× → PG 2,7× |
+| E3 Q3 alertas severidade 3, 1ª página | página fixa | 2 476 → 4 929 | 3,93 | 7,97 | 4,01 | 7,72 | +1,9% | −3,2% | PG 2,0× → PG 1,9× |
+| **E4 Painel 7 dias** | agregação | **244 881 → 489 346** | 90,8 | 6,12 | **173** | 7,93 | **+91%** | +30% | **CS 14,8× → CS 21,9×** |
+| **E4 Painel 1 dia** | agregação | 48 193 → 96 707 | 17,5 | 2,88 | 42,9 | 4,39 | +145% | +52% | CS 6,1× → CS 9,8× |
+| **E4 Painel 7 dias, só alertas** | agregação | 19 758 → 39 265 | 53,4 | 5,91 | 90,4 | 5,88 | +69% | −0,5% | CS 9,1× → CS 15,4× |
+
+Resposta idêntica nos dois bancos em todas as operações dos dois volumes; o vencedor de cada operação venceu de 26 a 30 dos 30 pares. Gerado por `python benchmarks/scale_report.py`.
+
+**Tempo dentro do banco (`Server-Timing`, mediana)**, que exclui HTTP e serialização:
+
+| Operação | PG 1 M | PG 2 M (réplica) | CS 1 M | CS 2 M (réplica) |
+| --- | --- | --- | --- | --- |
+| E4 Painel 7 dias | 88,1 ms | 170,7 ms (195,0) | 3,14 ms | 3,64 ms (2,84) |
+| E1 READ por UUID | 0,53 ms | 0,53 ms (0,59) | 0,73 ms | 1,08 ms (0,97) |
+
+**Estabilidade entre execuções.** A réplica de 2 M, rodada 3 minutos depois com o mesmo protocolo, variou de −30% a +40% em relação à execução principal em várias operações (por exemplo, painel 7 dias no Cassandra 7,93 × 5,52 ms; READ no PostgreSQL 1,67 × 2,35 ms). Por isso, **variações de até ±40% nas medianas HTTP não são atribuídas ao volume.** O que excede esse ruído, nas duas execuções de 2 M, é o crescimento da agregação no PostgreSQL.
+
+**E5 (psql) e rollup (Server-Timing), painel 7 dias, mediana:**
+
+| Volume | PG agregação na leitura | PG view materializada | PG REFRESH completo | Cassandra rollup |
+| --- | --- | --- | --- | --- |
+| 1 M | 82,6 ms | 1,54 ms | 360 ms | 3,14 ms |
+| 2 M | 160 ms | 1,09 ms | 640 ms | 3,63 ms |
+
+**E6 (8 clientes, mediana de latência, PG / CS):**
+
+| Volume | Política | CREATE | UPDATE | DELETE |
+| --- | --- | --- | --- | --- |
+| 1 M | padrão | 10,7 / **8,79** | 9,38 / **4,63** | 7,22 / **6,92** |
+| 1 M | antes do fsync | **4,55** / 8,17 | **3,75** / 4,67 | **3,08** / 6,63 |
+| 2 M | padrão | 10,3 / **7,98** | 9,87 / **4,50** | 8,78 / **6,49** |
+| 2 M | antes do fsync | **4,60** / 7,85 | **3,85** / 4,48 | **3,13** / 6,42 |
+
+**Ambiente por volume:** banco PostgreSQL 0,80 → 1,59 GB e keyspace Cassandra 0,33 → 0,66 GB (os dois ×2,0); acertos em `shared_buffers` 100% nos dois volumes; *key cache* do Cassandra 98,9% → 97,1%, com 0 → 10 MB lidos do disco pelo contêiner do Cassandra na fase de leitura.
+
+### Interpretação (o que foi medido × o que é hipótese)
+
+- **Agregação (E4): a diferença aumentou.** O PostgreSQL agrega na leitura uma entrada do índice de cobertura por evento do período; com o dobro de eventos na janela, o tempo no banco quase dobrou (88 → 171 ms; réplica 195 ms). O Cassandra lê as mesmas ≤ 7 × 360 células de contador (a tabela `event_counts_by_day` tinha 1 SSTable e ~372 células por partição em 2 M); seu tempo no banco ficou em 2,8–3,6 ms. A razão do painel de 7 dias foi de 14,8× para 21,9× (réplica 35,8×). No painel de 1 dia, o tempo no banco do Cassandra foi de 1,5 para 1,9–2,2 ms lendo as mesmas células: diferença de menos de 1 ms, dentro do ruído e não atribuída ao volume. Continua sendo o ganho da **pré-agregação na escrita**, não de um motor mais rápido.
+- **E5: o PostgreSQL pré-agregado também não cresce na leitura** (view materializada 1,5 → 1,1 ms), mas o REFRESH completo cresceu junto com a tabela (360 → 640 ms). No Cassandra o custo está no incremento a cada CREATE, que não mudou de forma mensurável no E6.
+- **Chave e página fixa (E1–E3): o PostgreSQL continuou vencendo todas.** B-tree e partição + clustering localizam a chave sem varrer a massa: o PostgreSQL ficou estável (E1 no banco 0,53 ms nos dois volumes) e as páginas Q1–Q3 do Cassandra também (−9% a −4%). O E1 no Cassandra subiu (0,73 → 1,08 ms no banco), **coincidindo** com a queda de acertos no *key cache* (o E1 lê UUIDs nunca lidos antes, por desenho) e com 10 MB lidos do disco; o *key cache* não estava cheio (≈ 70 mil entradas, 5,9 de 100 MiB). A causa exata (índices de partição de SSTables recém-compactadas fora do cache de páginas, por exemplo) **não foi isolada**.
+- **Resposta que cresce:** o "Q1 dispositivo pouco ativo" passou de 54 para 113 eventos na janela, e a primeira página de 54 para 100 itens; os dois bancos ficaram mais lentos (+20% e +15%), e o Cassandra fez 100 leituras canônicas em vez de 54.
+- **Escritas (E6): sem efeito mensurável do volume em 2 M** (todas as variações dentro do ruído). A política de durabilidade continua pesando mais: CREATE no PostgreSQL com 10,3 ms (fsync por commit) × 4,6 ms (confirmação antes do fsync). As janelas de perda continuam diferentes (~0,6 s × até 10 s).
+- **Cache:** com 2 M, os dados quentes ainda cabem nos limites de memória (PG 100% de acertos; banco de 1,59 GB para 2 GiB de contêiner). Em volumes maiores, o PostgreSQL ultrapassaria os 2 GiB antes do Cassandra (5 GiB): essa assimetria de configuração é uma **ameaça à validade** para extrapolar estes resultados, e por isso nenhuma tendência foi extrapolada além de 2 M.
+- **Um nó:** crescer a massa em uma máquina mostra como cada modelagem reage ao volume. Não demonstra escalabilidade horizontal, replicação nem tolerância a falhas.
 
 ## Reproduzir
 
