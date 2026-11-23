@@ -82,7 +82,7 @@ Resultados e interpretação: [benchmark-methodology.md](../benchmark-methodolog
 | Responsividade (iframes 820, 390 e 360 px) | Sem rolagem horizontal depois da correção do selo da comparação (havia 20 px em 390 px) |
 | Falhas corrigidas | Cartão da barra lateral cortado pelo botão da massa; limiar de "estável" (10%) menor que o ruído medido (40%); afirmação sem suporte sobre inserção em B-tree no E6; título do slide 14 e plural do slide 10 |
 | PDF | 18 páginas de 960 × 540 pt, gerado por `build_pdf.py` a partir de `slides.html` + `dados-escala.js`; páginas renderizadas e inspecionadas |
-| `cargo fmt --check`, `cargo test`, `cargo build` | **Não reexecutados nesta tarefa**: o backend não mudou (o binário release usado em todos os testes é de 15/11, mais novo que o código). Última execução: 10/10 em 17/11 ([verification-task05.md](verification-task05.md)) |
+| `cargo fmt --check`, `cargo test --locked`, `cargo build --locked` (contêiner `rust:1.99.1-slim-bookworm`, após o push principal) | fmt OK; **10/10** testes; build OK. O backend não mudou nesta tarefa; o binário release usado nos testes e benchmarks é de 15/11, mais novo que o código |
 
 ## 7. Limitações e pendências
 
