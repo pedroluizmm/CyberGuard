@@ -19,8 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bulk_events as bulk  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
-BULK_DIR = ROOT / "data/bulk"
-MANIFEST = BULK_DIR / f"{bulk.DATASET}.manifest.json"
+BULK_DIR = bulk.BULK_DIR
 
 
 def distribution(counter: Counter, top: int = 3) -> dict:
@@ -109,28 +108,46 @@ def build(seed: int, count: int) -> tuple[dict, float]:
     return manifest, time.perf_counter() - started
 
 
+def check_prefix(manifest: dict) -> str:
+    """A larger manifest must contain the original 1M manifest unchanged (profiles are prefixes)."""
+    base_path = bulk.manifest_path(bulk.BASE_PROFILE)
+    if manifest["logical_events"] <= bulk.BASE_PROFILE or not base_path.exists():
+        return "not applicable"
+    base = json.loads(base_path.read_text(encoding="utf-8"))
+    chunks = bulk.BASE_PROFILE // bulk.CHUNK_SIZE
+    same = (manifest["chunk_sha256"][:chunks] == base["chunk_sha256"]
+            and all(manifest["profiles"][k] == v for k, v in base["profiles"].items())
+            and manifest["world"] == base["world"] and manifest["seed"] == base["seed"])
+    if not same:
+        raise SystemExit(f"FAIL: the first {bulk.BASE_PROFILE} events differ from {base_path.name}")
+    return f"first {bulk.BASE_PROFILE} events identical to {base_path.name} (chunks, profiles, world)"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--count", type=int, default=bulk.PROFILES[-1],
+    parser.add_argument("--count", type=int, default=bulk.BASE_PROFILE,
                         help="logical events (multiple of 1000, at most 5 000 000)")
     parser.add_argument("--seed", type=int, default=bulk.DEFAULT_SEED)
     args = parser.parse_args()
     if not (bulk.CHUNK_SIZE <= args.count <= bulk.MAX_EVENTS) or args.count % bulk.CHUNK_SIZE:
         raise SystemExit("--count must be a multiple of 1000 between 1000 and 5000000")
     manifest, seconds = build(args.seed, args.count)
+    prefix = check_prefix(manifest)
     data = (json.dumps(manifest, indent=1, sort_keys=False) + "\n").encode("utf-8")
     BULK_DIR.mkdir(parents=True, exist_ok=True)
-    if MANIFEST.exists():
-        existing = MANIFEST.read_bytes()
+    target = bulk.manifest_path(args.count)
+    if target.exists():
+        existing = target.read_bytes()
         if existing != data:
-            raise SystemExit(f"FAIL: {MANIFEST.name} exists with different content; refusing to overwrite")
+            raise SystemExit(f"FAIL: {target.name} exists with different content; refusing to overwrite")
         status = "reproduced identical existing manifest"
     else:
-        MANIFEST.write_bytes(data)
+        target.write_bytes(data)
         status = "wrote new manifest"
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     report = {"kind": "generation_manifest", "dataset": bulk.DATASET, "seed": args.seed, "logical_events": args.count,
-              "status": status, "manifest_sha256": hashlib.sha256(data).hexdigest(),
+              "status": status, "manifest": target.name, "prefix_check": prefix,
+              "manifest_sha256": hashlib.sha256(data).hexdigest(),
               "generation_seconds": round(seconds, 3), "events_per_second": round(args.count / seconds, 1),
               "finished_at_utc": stamp, "python": platform.python_version(), "platform": platform.platform(),
               "note": "Generation time only (CPU, no I/O to databases); not a database measurement."}
@@ -138,8 +155,9 @@ def main() -> None:
     reports.mkdir(exist_ok=True)
     (reports / f"generate-{args.count}-{stamp}.json").write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8")
     last = manifest["profiles"][str(args.count)]
-    print(f"PASS: {status}; {args.count} events in {seconds:.1f}s; alerts={last['alert_events']}; "
+    print(f"PASS: {status} ({target.name}); {args.count} events in {seconds:.1f}s; alerts={last['alert_events']}; "
           f"expected Cassandra live rows={last['expected_cassandra_live_rows']}; sha256={last['sha256_canonical_ndjson'][:16]}...")
+    print(f"prefix check: {prefix}")
 
 
 if __name__ == "__main__":

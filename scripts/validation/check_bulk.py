@@ -32,7 +32,6 @@ import bulk_events as bulk  # noqa: E402
 from bulk_runtime import (REPORT_DIR, ROOT, Api, atomic_write_json, compose_exec, cql_copy, psql, run_text,  # noqa: E402
                           stamp, stream_csv, utc_now)
 
-MANIFEST = ROOT / "data/bulk" / f"{bulk.DATASET}.manifest.json"
 DATES = set(bulk.DATES)
 MOD = 1 << 128
 
@@ -80,7 +79,7 @@ def distribution(counts: dict) -> dict:
 class Validation:
     def __init__(self, args):
         self.args = args
-        self.manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        self.manifest = bulk.load_manifest(args.target)
         self.n = args.target
         self.gen = bulk.BulkGenerator(self.manifest["seed"])
         self.api = Api(args.base_url)

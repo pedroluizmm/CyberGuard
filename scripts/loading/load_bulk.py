@@ -32,7 +32,6 @@ import bulk_events as bulk  # noqa: E402
 from bulk_runtime import (REPORT_DIR, STATE_DIR, Api, ResourceSampler, Timer, append_line,  # noqa: E402
                           atomic_write_json, stamp, utc_now)
 
-MANIFEST = HERE.parents[1] / "data/bulk" / f"{bulk.DATASET}.manifest.json"
 RETRYABLE = {502, 503, 504}
 
 
@@ -92,12 +91,16 @@ def main() -> None:
     parser.add_argument("--api-build", default="unspecified", help="label recorded in the report (debug/release)")
     parser.add_argument("--docker-config")
     parser.add_argument("--sample-interval", type=float, default=10.0)
+    parser.add_argument("--stop-file", type=Path,
+                        help="stop cleanly at a chunk boundary as soon as this file exists (used by the watchdog)")
     args = parser.parse_args()
     if not 1 <= args.workers <= 64 or not 1 <= args.depth <= 4:
         raise SystemExit("--workers must be 1..64 and --depth 1..4")
-    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    if args.target % bulk.CHUNK_SIZE or not 0 < args.target <= manifest["logical_events"]:
-        raise SystemExit(f"--target must be a multiple of {bulk.CHUNK_SIZE} within the manifest count")
+    if args.target % bulk.CHUNK_SIZE or not 0 < args.target <= bulk.MAX_EVENTS:
+        raise SystemExit(f"--target must be a multiple of {bulk.CHUNK_SIZE} up to {bulk.MAX_EVENTS}")
+    manifest = bulk.load_manifest(args.target)
+    if args.stop_file and args.stop_file.exists():
+        raise SystemExit(f"STOPPED: stop file {args.stop_file} already exists; remove it after checking the cause")
     seed = manifest["seed"]
     gen = bulk.BulkGenerator(seed)
     checkpoint = Checkpoint(args.source, seed)
@@ -192,6 +195,10 @@ def main() -> None:
                     reasons.append("time budget reached; stopped cleanly at a chunk boundary")
                     interrupted = True
                     break
+                if args.stop_file and args.stop_file.exists():
+                    reasons.append(f"stop file present ({args.stop_file.name}); stopped cleanly at a chunk boundary")
+                    interrupted = True
+                    break
                 digest, events = gen.chunk_digest(chunk)
                 if digest != manifest["chunk_sha256"][chunk]:
                     reasons.append(f"generator output differs from manifest at chunk {chunk}")
@@ -213,7 +220,8 @@ def main() -> None:
     sent = totals["created"] + totals["reused"]
     report = {
         "kind": "initial_load_via_api", "dataset": bulk.DATASET, "seed": seed, "source": args.source,
-        "target_events": args.target, "run_id": run_id, "finished_at_utc": utc_now(),
+        "target_events": args.target, "manifest_events": manifest["logical_events"],
+        "run_id": run_id, "finished_at_utc": utc_now(),
         "chunks_in_target": total_chunks, "chunks_skipped_from_checkpoint": skipped,
         "chunks_completed_this_run": completed_now, "checkpoint_completed_events": len(checkpoint.done) * bulk.CHUNK_SIZE,
         "events_acknowledged_this_run": sent, **totals,

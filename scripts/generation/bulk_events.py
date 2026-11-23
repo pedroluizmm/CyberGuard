@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import ipaddress
 import json
+from pathlib import Path
 import uuid
 
 DATASET = "cyberguard-bulk-v1"
@@ -24,7 +25,11 @@ GENERATOR_VERSION = "1.0.0"
 DEFAULT_SEED = 20261109
 MAX_EVENTS = 5_000_000
 CHUNK_SIZE = 1000
-PROFILES = (10_000, 100_000, 1_000_000)
+BASE_PROFILE = 1_000_000  # original Task 03 manifest; reproduced byte for byte
+# Profile boundaries recorded in a manifest (only those <= its count). Scale milestones
+# (2M..5M) were added for the scale experiment; a 1M manifest is unchanged by them.
+PROFILES = (10_000, 100_000, 1_000_000, 2_000_000, 3_000_000, 4_000_000, 5_000_000)
+BULK_DIR = Path(__file__).resolve().parents[2] / "data/bulk"
 WINDOW_START = datetime(2026, 10, 5, tzinfo=timezone.utc)  # Monday, disjoint from the 24-event sample
 WINDOW_DAYS = 28
 DAY_MS = 86_400_000
@@ -106,6 +111,26 @@ def fmt_time(ms: int) -> tuple[str, str]:
 def canonical_line(event: dict) -> bytes:
     """Stable serialization used for hashes; independent of dict insertion order."""
     return (json.dumps(event, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n").encode("ascii")
+
+
+def manifest_path(count: int) -> Path:
+    """The 1M manifest keeps its original name; larger prefixes get one file per count."""
+    if count == BASE_PROFILE:
+        return BULK_DIR / f"{DATASET}.manifest.json"
+    return BULK_DIR / f"{DATASET}.manifest-{count}.json"
+
+
+def load_manifest(target: int) -> dict:
+    """Smallest existing manifest that covers `target` events (profiles are prefixes)."""
+    found = []
+    for path in sorted(BULK_DIR.glob(f"{DATASET}.manifest*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data.get("dataset") == DATASET and data.get("logical_events", 0) >= target:
+            found.append((data["logical_events"], path.name, data))
+    if not found:
+        raise SystemExit(f"FAIL: no manifest covers {target} events; run "
+                         f"'python scripts/generation/generate_bulk.py --count <N>' with N >= {target}")
+    return min(found, key=lambda item: item[0])[2]
 
 
 # Business-like hourly profile (UTC) and weekday/weekend weights, integers only.

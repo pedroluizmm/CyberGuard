@@ -1,0 +1,16 @@
+{
+ "kind": "generation_manifest",
+ "dataset": "cyberguard-bulk-v1",
+ "seed": 20261109,
+ "logical_events": 5000000,
+ "status": "wrote new manifest",
+ "manifest": "cyberguard-bulk-v1.manifest-5000000.json",
+ "prefix_check": "first 1000000 events identical to cyberguard-bulk-v1.manifest.json (chunks, profiles, world)",
+ "manifest_sha256": "ac9bf5f6ac9a6ec197fff97add9a7c1f4093c58be4fcc92aa5c8de41bf73ac4f",
+ "generation_seconds": 229.163,
+ "events_per_second": 21818.6,
+ "finished_at_utc": "20261123T193140Z",
+ "python": "3.13.6",
+ "platform": "Windows-11-10.0.26200-SP0",
+ "note": "Generation time only (CPU, no I/O to databases); not a database measurement."
+}

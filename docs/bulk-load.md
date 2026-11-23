@@ -75,17 +75,40 @@ Um controle negativo (`--target 9000` com 10 mil carregados) falhou em 10 checks
 
 Nenhum cache foi limpo, nenhum serviço foi reiniciado entre etapas e não houve aquecimento deliberado. As leituras de validação ocorrem logo após a carga, com memtables/page cache quentes, e o `flush` precede apenas as métricas de tamanho. Por isso, as durações de consultas registradas pelo validador são observações funcionais, não latências comparáveis.
 
+## Ampliação além de 1 M (23/11)
+
+A massa cresce **acrescentando índices** ao mesmo dataset: `event(i)` não depende do total, então 2 M contém exatamente os eventos de 1 M mais os índices `[1 M, 2 M)`, e assim por diante até o limite do gerador (5 M). Nada foi apagado ou recarregado.
+
+- **Manifesto ampliado:** `python scripts/generation/generate_bulk.py --count 5000000` grava `data/bulk/cyberguard-bulk-v1.manifest-5000000.json` (≈ 380 KB, 5 000 hashes de chunk e perfis de 1, 2, 3, 4 e 5 M). O script confere que os chunks, perfis e o "mundo" dos primeiros 1 M eventos são idênticos ao manifesto original, que continua byte a byte igual.
+- **Mesma distribuição:** os eventos novos seguem as mesmas regras do gerador (janela de 28 dias, perfis horários, Zipf de dispositivos/IPs, 20 campanhas). Logo, cada janela de tempo recebe proporcionalmente mais eventos: o painel de 7 dias cobre 244 881 eventos em 1 M, e a contagem medida em cada volume está em `environment.json` (`workload`) de cada execução. Nenhuma distribuição nova foi criada para favorecer um banco.
+- **Partições previstas (manifesto):** a maior partição de `events_by_device_day` vai de 11 822 linhas (1 M) a 23 741 (2 M), 35 552 (3 M) e 59 211 (5 M); a de `events_by_ip_day`, de 11 517 a 57 675. Todas ficam abaixo do limiar de revisão (~100 mil linhas), sem necessidade de *buckets*.
+- **Carga incremental:** `load_bulk.py --target N` lê o checkpoint existente (chunks 0–999 de cada banco) e envia só os chunks novos, pela mesma API e com as mesmas garantias (CREATE idempotente por UUID; contador do rollup incrementado só na transição LWT vencedora, então um reenvio não conta duas vezes). Os checkpoints de 1 M foram copiados para `data/generated/cyberguard-bulk-v1/backup-1m/` antes de crescer.
+- **Proteção:** `scripts/loading/watchdog.py` monitora host, VM Docker, energia, contêineres e Cassandra a cada 15 s e cria o arquivo de parada que `load_bulk.py --stop-file` respeita na fronteira de chunk (detalhes em `scripts/README.md`).
+- **Execução:** API **release**; as duas cargas de cada marco rodaram **em paralelo** (um processo por banco), para caber no prazo. As taxas registradas em `data/bulk/reports/load-*-<N>-*.json` são, portanto, observadas com os dois bancos sob carga ao mesmo tempo, e continuam não sendo benchmark.
+- **Marcos:** em cada marco, antes de medir: `check_bulk.py --target N` (conteúdo integral, projeções, partições, API), `reconcile_rollup.py` (simulação) e, então, a campanha de benchmarks (ver [benchmark-methodology.md](benchmark-methodology.md#campanha-de-escala-1-m--massa-ampliada)).
+
 ## Reproduzir
 
 ```powershell
 python scripts/validation/test_bulk_generator.py
 python scripts/generation/generate_bulk.py --count 1000000      # reproduz o manifesto versionado
+python scripts/generation/generate_bulk.py --count 5000000      # manifesto ampliado (perfis 1-5 M)
 # API ativa (README), bancos healthy e schemas aplicados
 foreach ($n in 10000, 100000, 1000000) {
   python scripts/loading/load_bulk.py --source postgresql --target $n --api-build debug
   python scripts/loading/load_bulk.py --source cassandra  --target $n --api-build debug
   python scripts/validation/check_bulk.py --target $n
 }
+# ampliação (API release, watchdog ativo em outro terminal)
+python scripts/loading/watchdog.py --stop-file data/generated/cyberguard-bulk-v1/STOP
+foreach ($n in 2000000, 3000000, 5000000) {
+  python scripts/loading/load_bulk.py --source postgresql --target $n --api-build release --stop-file data/generated/cyberguard-bulk-v1/STOP
+  python scripts/loading/load_bulk.py --source cassandra  --target $n --api-build release --stop-file data/generated/cyberguard-bulk-v1/STOP
+  python scripts/validation/check_bulk.py --target $n
+  python scripts/loading/reconcile_rollup.py
+}
 ```
+
+Se o watchdog parar a carga, investigue a causa registrada em `STOP` e em `watchdog-*.ndjson`, apague o arquivo de parada e repita o mesmo comando: a carga retoma do checkpoint.
 
 Use `--docker-config tmp/docker` nos scripts que acessam Docker, se o perfil Docker não puder ser lido. A carga é retomável: repetir o mesmo comando continua do checkpoint. Para recomeçar do zero em outro ambiente, use bancos novos; nunca apague volumes ou tabelas existentes para isso.

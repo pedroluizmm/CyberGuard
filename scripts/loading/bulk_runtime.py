@@ -208,6 +208,30 @@ class ResourceSampler(threading.Thread):
                 "note": "docker stats CPU% is relative to one vCPU (100% = one core)."}
 
 
+def power_state() -> dict:
+    """Host power source, battery and CPU clock: laptop power mode changes absolute latencies."""
+    out = {}
+    try:
+        import psutil
+        battery = psutil.sensors_battery()
+        if battery is not None:
+            out.update({"on_ac_power": bool(battery.power_plugged), "battery_percent": round(battery.percent, 1)})
+        freq = psutil.cpu_freq()
+        if freq:
+            out.update({"cpu_mhz_current": round(freq.current), "cpu_mhz_max": round(freq.max)})
+    except (ImportError, OSError, RuntimeError):
+        pass
+    try:
+        scheme = subprocess.run(["powercfg", "/getactivescheme"], capture_output=True, timeout=10)
+        text = scheme.stdout.decode("utf-8", errors="replace")
+        match = re.search(r"\(([^)]+)\)\s*$", text.strip())
+        if match:
+            out["power_plan"] = match.group(1)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return out
+
+
 class Timer:
     def __init__(self):
         self.started = time.perf_counter()

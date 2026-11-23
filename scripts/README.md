@@ -8,7 +8,8 @@ Requer Python 3.11+, apenas com a biblioteca padrão; `psutil` é opcional e só
 | Esquemas | `python scripts/apply_schema.py` (todos os `database/*/NNN_*`, aditivos) |
 | API | `python scripts/run_api.py build \| start \| stop \| status \| logs` (Rust em contêiner) |
 | Amostra | `generation/generate_sample.py`, `loading/load_sample.py`, `validation/check_sample.py` |
-| Massa 1 M | `generation/generate_bulk.py --count 1000000`, `loading/load_bulk.py --source <banco> --target 1000000`, `validation/check_bulk.py --target 1000000` |
+| Massa (1 M a 5 M) | `generation/generate_bulk.py --count N`, `loading/load_bulk.py --source <banco> --target N`, `validation/check_bulk.py --target N` (marcos 1, 2, 3, 4 e 5 M) |
+| Proteção da carga | `loading/watchdog.py --stop-file data/generated/cyberguard-bulk-v1/STOP` + `load_bulk.py ... --stop-file <mesmo arquivo>` |
 | Rollup do painel | `loading/reconcile_rollup.py` (simulação) / `--apply` (backfill ou correção) |
 | Testes | `validation/check_foundation.py`, `validation/check_api.py`, `validation/test_integration.py`, `validation/test_recovery.py`, `validation/test_bulk_generator.py` |
 | Benchmarks | `benchmarks/run_benchmarks.py` (ver `benchmarks/README.md`) |
@@ -26,7 +27,7 @@ Requer Python 3.11+, apenas com a biblioteca padrão; `psutil` é opcional e só
 
 `bulk_events.py` é o gerador volumoso (Task 03): `BulkGenerator(seed).event(i)` é função pura de dataset, seed e índice, baseada apenas em SHA-256 e pesos inteiros. Perfis crescentes são prefixos `[0, N)` do mesmo conjunto lógico. Os eventos são produzidos em streaming, nunca gravados em massa.
 
-`generate_bulk.py --count 1000000` calcula o manifesto versionável `data/bulk/cyberguard-bulk-v1.manifest.json` (seed, algoritmos, hashes por chunk e por perfil, contagens e distribuição de partições) e recusa sobrescrever um manifesto diferente. Repetir o comando reproduz o arquivo byte a byte. Limite: 5 000 000 eventos; nada é gerado automaticamente. Ver `docs/bulk-load.md`.
+`generate_bulk.py --count 1000000` calcula o manifesto versionável `data/bulk/cyberguard-bulk-v1.manifest.json` (seed, algoritmos, hashes por chunk e por perfil, contagens e distribuição de partições) e recusa sobrescrever um manifesto diferente. Repetir o comando reproduz o arquivo byte a byte. Outros volumes geram `cyberguard-bulk-v1.manifest-<N>.json` (ex.: `--count 5000000`, com perfis de 1, 2, 3, 4 e 5 M), e o script confere que os primeiros 1 M eventos são idênticos ao manifesto original. Limite: 5 000 000 eventos; nada é gerado automaticamente. Ver `docs/bulk-load.md`.
 
 ### loading
 
@@ -34,7 +35,9 @@ Requer Python 3.11+, apenas com a biblioteca padrão; `psutil` é opcional e só
 
 `load_sample.py` envia a amostra de 24 eventos para cada fonte via CRUD real. `--source both` é padrão; `postgresql`/`cassandra` permitem execução separada. Repetição idêntica é idempotente; conflitos e erros interrompem a carga, sem sobrescrever conteúdo nem gerar novos UUIDs como retry. É restrito a amostras de até 1000 eventos.
 
-`load_bulk.py --source <postgresql|cassandra> --target N` carrega os índices `[0, N)` do dataset `cyberguard-bulk-v1` pela API real (mesma validação, transação PostgreSQL e fluxo LWT/batch Cassandra). Regenera cada chunk de 1000, confere o SHA-256 do manifesto, usa 16 workers keep-alive, retry limitado com o mesmo UUID e checkpoint atômico por chunk em `data/generated/cyberguard-bulk-v1/`. Repetir o comando retoma; `--ignore-checkpoint` testa idempotência; `--max-seconds` para em fronteira de chunk. Relatório pequeno em `data/bulk/reports/`.
+`load_bulk.py --source <postgresql|cassandra> --target N` carrega os índices `[0, N)` do dataset `cyberguard-bulk-v1` pela API real (mesma validação, transação PostgreSQL e fluxo LWT/batch Cassandra). Regenera cada chunk de 1000, confere o SHA-256 do menor manifesto que cobre o alvo, usa 16 workers keep-alive, retry limitado com o mesmo UUID e checkpoint atômico por chunk em `data/generated/cyberguard-bulk-v1/`. Repetir o comando retoma; aumentar `--target` carrega só os índices novos; `--ignore-checkpoint` testa idempotência; `--max-seconds` e `--stop-file` param em fronteira de chunk. Relatório pequeno em `data/bulk/reports/`.
+
+`watchdog.py` amostra a cada 15 s a RAM livre do host, memória e swap da VM Docker, disco livre, energia do notebook, saúde/OOM dos contêineres, heap e compactações do Cassandra e a sonda de armazenamento da API. Ao passar de um limite (bateria < 30% fora da tomada, disco < 40 GiB, OOM, contêiner unhealthy, ou RAM/swap/heap fora do limite por 4 amostras seguidas), cria o arquivo de parada; o carregador termina o chunk em voo e para com o checkpoint íntegro.
 
 `bulk_runtime.py`: cliente HTTP keep-alive, comandos Docker/psql/cqlsh sem expor credenciais, exportações `COPY ... TO STDOUT` em streaming, amostragem de `docker stats` e escrita atômica.
 
@@ -44,7 +47,7 @@ Requer Python 3.11+, apenas com a biblioteca padrão; `psutil` é opcional e só
 2. Lê os contadores atuais e escreve apenas a diferença. Por isso é seguro repetir: uma segunda execução aplica 0.
 3. Agrega o PostgreSQL de forma independente e compara célula a célula, o que serve também como prova de equivalência dos bancos.
 
-Sem `--apply`, apenas simula. Rode com a API ociosa. O relatório vai para `data/bulk/reports/rollup-reconcile-*.json`.
+Sem `--apply`, apenas simula e grava `data/bulk/reports/rollup-check-*.json`. Com `--apply`, escreve as diferenças e grava `rollup-reconcile-*.json`. Rode com a API ociosa.
 
 Tempos de carga são carga inicial via API, não benchmark. Ver `docs/bulk-load.md`.
 

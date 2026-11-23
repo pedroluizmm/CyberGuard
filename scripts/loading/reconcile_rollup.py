@@ -12,7 +12,8 @@ Truth is derived from the database itself, never from the generator:
 
 Run with the API idle (no concurrent CREATE/DELETE), otherwise in-flight
 operations may be counted twice or missed; the final verification would show it.
-Default is a dry run; pass --apply to write the deltas.
+Default is a dry run (a rollup-check-*.json report is still written);
+pass --apply to write the deltas (rollup-reconcile-*.json).
 """
 import argparse
 import json
@@ -110,10 +111,10 @@ def main() -> None:
     print(f"{label}: counters equal canonical truth")
     ok = ok and (equal or not args.apply)
     report["seconds"] = round(time.perf_counter() - started, 1)
-    if args.apply:
-        out = REPORT_DIR / f"rollup-reconcile-{stamp()}.json"
-        atomic_write_json(out, report)
-        print(f"report: {out.relative_to(ROOT).as_posix()}")
+    # Dry runs are recorded too (evidence per dataset size); only --apply writes to the database.
+    out = REPORT_DIR / f"rollup-{'reconcile' if args.apply else 'check'}-{stamp()}.json"
+    atomic_write_json(out, report)
+    print(f"report: {out.relative_to(ROOT).as_posix()}")
     raise SystemExit(0 if ok else 1)
 
 
