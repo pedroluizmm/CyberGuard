@@ -70,15 +70,28 @@ def stream_csv(command: list[str], **fmt):
     import io
     csv.field_size_limit(1 << 24)
     proc = subprocess.Popen(command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # Drain stderr concurrently: a full stderr pipe (e.g. many cqlsh retry warnings) would block the exporter.
+    chunks: list[bytes] = []
+    drain = threading.Thread(target=lambda: chunks.extend(iter(lambda: proc.stderr.read(65536), b"")), daemon=True)
+    drain.start()
     yield from csv.reader(io.TextIOWrapper(proc.stdout, encoding="utf-8", newline=""), **fmt)
-    stderr = proc.stderr.read()
-    if proc.wait() != 0 or any(t in stderr for t in (b"Exception", b"Error", b"Failed")):
-        raise RuntimeError(f"export failed ({command[-1][:60]}...)")
+    code = proc.wait()
+    drain.join(timeout=30)
+    stderr = b"".join(chunks)
+    if code != 0 or any(t in stderr for t in (b"Exception", b"Error", b"Failed")):
+        tail = " | ".join(l.strip() for l in stderr.decode("utf-8", "replace").splitlines() if l.strip())[-300:]
+        raise RuntimeError(f"export failed ({command[-1][:60]}...): exit {code}; {tail}")
+
+
+# cqlsh COPY workers run inside the Cassandra container and count against its memory limit (5 GiB);
+# the default (one per CPU, up to 16) nearly exhausted it at 5M events. Override with CYBERGUARD_CQLSH_PROCESSES.
+CQLSH_PROCESSES = int(os.environ.get("CYBERGUARD_CQLSH_PROCESSES", "4"))
 
 
 def cql_copy(config: str | None, table: str, columns: str):
     return stream_csv(cqlsh(config, "--request-timeout=120", "-e",
-                            f"COPY cyberguard.{table} ({columns}) TO STDOUT WITH HEADER=false AND PAGETIMEOUT=60"),
+                            f"COPY cyberguard.{table} ({columns}) TO STDOUT WITH HEADER=false AND PAGETIMEOUT=60 "
+                            f"AND NUMPROCESSES={CQLSH_PROCESSES}"),
                       escapechar="\\", doublequote=False)
 
 

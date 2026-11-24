@@ -1,0 +1,4 @@
+{
+ "20261124T093539Z-main": "5 M medido com a VM do Docker degradada após suspensão do notebook (02:56-04:21): /api/health em 5,2 ms (normal ~1 ms), READ 4,8-6,8x mais lento dentro dos dois bancos com 100% de acertos de cache e 0 byte lido do disco. Repetido após reiniciar o Docker Desktop.",
+ "20261124T094414Z-durability": "Mesma condição degradada da execução 20261124T093539Z-main (E6 com synchronous_commit=off). Repetido após reiniciar o Docker Desktop."
+}

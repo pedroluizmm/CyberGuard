@@ -1,0 +1,181 @@
+{
+ "captured_at": "2026-11-24T09:53:54.277Z",
+ "suite": "durability",
+ "campaign": "escala",
+ "host": {
+  "os": "Windows-11-10.0.26200-SP0",
+  "processor": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel",
+  "logical_cpus": 22,
+  "physical_cpus": 16,
+  "ram_total_gib": 15.37,
+  "ram_available_gib": 0.54,
+  "python": "3.13.6",
+  "cpu_model": "Intel(R) Core(TM) Ultra 7 155H",
+  "power": {
+   "on_ac_power": false,
+   "battery_percent": 76,
+   "cpu_mhz_current": 1400,
+   "cpu_mhz_max": 1400,
+   "power_plan": "Equilibrado"
+  }
+ },
+ "git": {
+  "commit": "983d0e08f16e5419f010052d545de11f18648f00",
+  "dirty_files": 27
+ },
+ "docker": {
+  "server_version": "29.4.3",
+  "vm_cpus": 22,
+  "vm_memory_gib": 7.44,
+  "os": "Docker Desktop"
+ },
+ "containers": {
+  "cyberguard-postgresql-1": {
+   "image": "postgres:17.11-bookworm",
+   "mem_limit_gib": 2.0,
+   "cpu_limit": null
+  },
+  "cyberguard-cassandra-1": {
+   "image": "cassandra:5.0.9",
+   "mem_limit_gib": 5.0,
+   "cpu_limit": null
+  },
+  "cyberguard-api": {
+   "image": "rust:1.99.1-slim-bookworm",
+   "mem_limit_gib": null,
+   "cpu_limit": null
+  }
+ },
+ "container_usage_at_start": [
+  "cyberguard-api|0.90%|4.156MiB / 7.442GiB",
+  "cyberguard-postgresql-1|0.02%|947MiB / 2GiB",
+  "cyberguard-cassandra-1|106.68%|3.277GiB / 5GiB"
+ ],
+ "api": {
+  "health": {
+   "status": "ok",
+   "service": "cyberguard-api",
+   "version": "0.1.0",
+   "build": "release"
+  },
+  "runtime": {
+   "build": "release",
+   "cassandra_read_concurrency": 32,
+   "postgres_synchronous_commit": "off",
+   "postgres_pool_size": 16
+  }
+ },
+ "postgresql": {
+  "version": "PostgreSQL 17.11 (Debian 17.11-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit",
+  "settings": {
+   "effective_cache_size": "4GB",
+   "fsync": "on",
+   "jit": "on",
+   "maintenance_work_mem": "64MB",
+   "max_connections": "100",
+   "max_parallel_workers_per_gather": "2",
+   "random_page_cost": "4",
+   "shared_buffers": "512MB",
+   "synchronous_commit": "on",
+   "wal_level": "replica",
+   "work_mem": "4MB"
+  },
+  "indexes": [
+   "CREATE INDEX events_alert_severity_time_idx ON public.events USING btree (severity, occurred_at DESC, event_id DESC) WHERE (category = 'alert'::text)",
+   "CREATE INDEX events_device_time_idx ON public.events USING btree (device_id, occurred_at DESC, event_id DESC)",
+   "CREATE INDEX events_ip_time_idx ON public.events USING btree (source_ip, occurred_at DESC, event_id DESC)",
+   "CREATE UNIQUE INDEX events_pkey ON public.events USING btree (event_id)",
+   "CREATE INDEX events_time_cover_idx ON public.events USING btree (occurred_at) INCLUDE (category, severity)"
+  ],
+  "events_rows": 5000024,
+  "events_total_bytes": 3588562944,
+  "events_heap_bytes": 2304573440,
+  "events_index_bytes": 1283317760,
+  "index_bytes": {
+   "events_pkey": 199802880,
+   "events_device_time_idx": 369524736,
+   "events_ip_time_idx": 360882176,
+   "events_alert_severity_time_idx": 26550272,
+   "events_time_cover_idx": 326459392
+  },
+  "wal_bytes": 956301312,
+  "database_bytes": 4061787827,
+  "last_vacuum": "2026-11-24T09:50:49.024597+00:00"
+ },
+ "cassandra": {
+  "version": "5.0.9",
+  "settings": {
+   "commitlog_sync": "periodic",
+   "commitlog_sync_period": "10000ms",
+   "concurrent_reads": "32",
+   "concurrent_writes": "32",
+   "file_cache_size": "512MiB",
+   "key_cache_size": "100MiB",
+   "memtable_heap_space": "512MiB",
+   "row_cache_size": "0MiB"
+  },
+  "compaction": {
+   "alerts_by_severity_day": "org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy",
+   "event_counts_by_day": "org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy",
+   "events_by_device_day": "org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy",
+   "events_by_id": "org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy",
+   "events_by_ip_day": "org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy"
+  },
+  "tables": {
+   "alerts_by_severity_day": {
+    "SSTable count": "3",
+    "Space used (live)": "12176040",
+    "Number of partitions (estimate)": "167",
+    "Compacted partition maximum bytes": "182785"
+   },
+   "event_counts_by_day": {
+    "SSTable count": "3",
+    "Space used (live)": "459028",
+    "Number of partitions (estimate)": "50",
+    "Compacted partition maximum bytes": "24601"
+   },
+   "events_by_device_day": {
+    "SSTable count": "4",
+    "Space used (live)": "147711985",
+    "Number of partitions (estimate)": "11315",
+    "Compacted partition maximum bytes": "943127"
+   },
+   "events_by_id": {
+    "SSTable count": "5",
+    "Space used (live)": "1318965757",
+    "Number of partitions (estimate)": "5042850",
+    "Compacted partition maximum bytes": "770"
+   },
+   "events_by_ip_day": {
+    "SSTable count": "3",
+    "Space used (live)": "174736114",
+    "Number of partitions (estimate)": "272767",
+    "Compacted partition maximum bytes": "785939"
+   }
+  },
+  "du_bytes": {
+   "/var/lib/cassandra/data/cyberguard": 1654048924,
+   "/var/lib/cassandra/data/system": 405782337,
+   "/var/lib/cassandra/commitlog": 67108864
+  }
+ },
+ "dataset": {
+  "name": "cyberguard-bulk-v1",
+  "logical_events": 5000000,
+  "measured": {
+   "logical_events": 5000000,
+   "by_source": {
+    "postgresql": 5000000,
+    "cassandra": 5000000
+   },
+   "method": "soma dos pain\u00e9is semanais da janela 05/10\u201301/11 nos dois bancos (PG agrega, Cassandra l\u00ea o rollup)"
+  },
+  "alerts": 410557,
+  "manifest_profile": true,
+  "window": [
+   "2026-10-05",
+   "2026-11-01"
+  ]
+ },
+ "workload": null
+}

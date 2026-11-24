@@ -710,9 +710,16 @@ def scale_view(sizes: list[dict]) -> dict:
 def rebuild_summary(results: Path) -> None:
     """Historic runs (no campaign) stay at the top level; campaign runs are grouped by dataset size."""
     latest, campaigns = {}, {}
+    # Runs measured under a documented invalid condition stay on disk but out of the summary.
+    excluded_path = results / "excluded.json"
+    excluded = json.loads(excluded_path.read_text(encoding="utf-8")) if excluded_path.is_file() else {}
+    skipped = []
     for path in sorted(results.glob("*/run.json")):
         run = json.loads(path.read_text(encoding="utf-8"))
         if not run.get("complete"):
+            continue
+        if run["run_id"] in excluded:
+            skipped.append({"run_id": run["run_id"], "reason": excluded[run["run_id"]]})
             continue
         run = with_environment(path, run)
         campaign = run.get("campaign")
@@ -741,7 +748,7 @@ def rebuild_summary(results: Path) -> None:
         return
     summary = {"generated_at": utc_now(), "schema": 2,
                "main": latest["main"], "n1": latest.get("n1"),
-               "writes": latest.get("writes"), "durability": latest.get("durability"), "campaigns": {}}
+               "writes": latest.get("writes"), "durability": latest.get("durability"), "campaigns": {}, "excluded_runs": skipped}
     for name, by_size in sorted(campaigns.items()):
         sizes = [by_size[n] for n in sorted(by_size) if "main" in by_size[n]]
         summary["campaigns"][name] = {"sizes": sizes, "scale": scale_view(sizes)}

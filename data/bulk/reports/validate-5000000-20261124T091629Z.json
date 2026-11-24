@@ -1,0 +1,697 @@
+{
+ "expected_seconds": 1027.75,
+ "postgresql": {
+  "export_seconds": 1078.7,
+  "events_table_rows": 5000024,
+  "dataset_events": 5000000,
+  "other_events": 24,
+  "event_registry_rows": 5012791,
+  "event_registry_deleted": 12767,
+  "devices_rows": 437,
+  "content": {
+   "rows": 5000000,
+   "digest": "2a2913ed3f1448d537343958a2686a05"
+  }
+ },
+ "cassandra": {
+  "export_seconds": 1723.8,
+  "canonical_export_seconds": 1253.6,
+  "events_by_id_lifecycle": {
+   "dataset": {
+    "active": 5000000
+   },
+   "other": {
+    "deleted": 12777,
+    "active": 24
+   }
+  },
+  "projections": {
+   "events_by_device_day": {
+    "rows_in_dataset_window": 5000000,
+    "rows_outside_window": 24,
+    "rows": 5000000,
+    "digest": "942af0a6c3e93d76f8d3c75c03a42a42"
+   },
+   "events_by_ip_day": {
+    "rows_in_dataset_window": 5000000,
+    "rows_outside_window": 24,
+    "rows": 5000000,
+    "digest": "3a185784d5376cd08a270c059fb4a441"
+   },
+   "alerts_by_severity_day": {
+    "rows_in_dataset_window": 410557,
+    "rows_outside_window": 9,
+    "rows": 410557,
+    "digest": "8791340acd938e774e068717bb304116"
+   }
+  },
+  "dataset_live_rows": 15410557,
+  "expected_live_rows": 15410557,
+  "partitions_measured": {
+   "events_by_device_day": {
+    "partitions": 11004,
+    "rows": 5000000,
+    "p50_rows": 41,
+    "p99_rows": 9180,
+    "max_rows": 59211,
+    "max_key": [
+     "ids-sensor-06",
+     "2026-10-27"
+    ]
+   },
+   "events_by_ip_day": {
+    "partitions": 269308,
+    "rows": 5000000,
+    "p50_rows": 5,
+    "p99_rows": 222,
+    "max_rows": 57675,
+    "max_key": [
+     "2001:db8:bad:4::6",
+     "2026-10-27"
+    ]
+   },
+   "alerts_by_severity_day": {
+    "partitions": 140,
+    "rows": 410557,
+    "p50_rows": 2826,
+    "p99_rows": 6316,
+    "max_rows": 6526,
+    "max_key": [
+     "3",
+     "2026-10-14"
+    ]
+   }
+  },
+  "content": {
+   "rows": 5000000,
+   "digest": "2a2913ed3f1448d537343958a2686a05"
+  }
+ },
+ "queries": [
+  {
+   "name": "q1_hot_device_7d",
+   "kind": "device",
+   "value": "ids-sensor-06",
+   "from": "2026-10-24T00:00:00Z",
+   "to": "2026-10-31T00:00:00Z",
+   "expected_items": 67624,
+   "postgresql": {
+    "pages": 100,
+    "items": 10000,
+    "statuses": [
+     200
+    ],
+    "complete": false,
+    "seconds": 8.694
+   },
+   "cassandra": {
+    "pages": 100,
+    "items": 10000,
+    "statuses": [
+     200
+    ],
+    "complete": false,
+    "seconds": 7.336
+   },
+   "compared_prefix_only": true,
+   "equal": true
+  },
+  {
+   "name": "q1_cold_device_7d",
+   "kind": "device",
+   "value": "ws-hr-0050",
+   "from": "2026-10-12T00:00:00Z",
+   "to": "2026-10-19T00:00:00Z",
+   "expected_items": 317,
+   "postgresql": {
+    "pages": 4,
+    "items": 317,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 0.57
+   },
+   "cassandra": {
+    "pages": 4,
+    "items": 317,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 0.249
+   },
+   "compared_prefix_only": false,
+   "equal": true
+  },
+  {
+   "name": "q2_hot_ipv6_7d",
+   "kind": "ip",
+   "value": "2001:db8:bad:4::6",
+   "from": "2026-10-24T00:00:00Z",
+   "to": "2026-10-31T00:00:00Z",
+   "expected_items": 57694,
+   "postgresql": {
+    "pages": 100,
+    "items": 10000,
+    "statuses": [
+     200
+    ],
+    "complete": false,
+    "seconds": 7.703
+   },
+   "cassandra": {
+    "pages": 100,
+    "items": 10000,
+    "statuses": [
+     200
+    ],
+    "complete": false,
+    "seconds": 5.746
+   },
+   "compared_prefix_only": true,
+   "equal": true
+  },
+  {
+   "name": "q2_ipv4_1d",
+   "kind": "ip",
+   "value": "203.0.113.173",
+   "from": "2026-10-08T00:00:00Z",
+   "to": "2026-10-09T00:00:00Z",
+   "expected_items": 43305,
+   "postgresql": {
+    "pages": 100,
+    "items": 10000,
+    "statuses": [
+     200
+    ],
+    "complete": false,
+    "seconds": 7.677
+   },
+   "cassandra": {
+    "pages": 100,
+    "items": 10000,
+    "statuses": [
+     200
+    ],
+    "complete": false,
+    "seconds": 7.117
+   },
+   "compared_prefix_only": true,
+   "equal": true
+  },
+  {
+   "name": "q3_hot_severity_2d",
+   "kind": "alerts",
+   "value": 3,
+   "from": "2026-10-13T00:00:00Z",
+   "to": "2026-10-15T00:00:00Z",
+   "expected_items": 12285,
+   "postgresql": {
+    "pages": 100,
+    "items": 10000,
+    "statuses": [
+     200
+    ],
+    "complete": false,
+    "seconds": 9.752
+   },
+   "cassandra": {
+    "pages": 100,
+    "items": 10000,
+    "statuses": [
+     200
+    ],
+    "complete": false,
+    "seconds": 5.639
+   },
+   "compared_prefix_only": true,
+   "equal": true
+  },
+  {
+   "name": "q3_severity5_7d",
+   "kind": "alerts",
+   "value": 5,
+   "from": "2026-10-17T00:00:00Z",
+   "to": "2026-10-24T00:00:00Z",
+   "expected_items": 7462,
+   "postgresql": {
+    "pages": 75,
+    "items": 7462,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 4.276
+   },
+   "cassandra": {
+    "pages": 75,
+    "items": 7462,
+    "statuses": [
+     200
+    ],
+    "complete": true,
+    "seconds": 4.36
+   },
+   "compared_prefix_only": false,
+   "equal": true
+  }
+ ],
+ "api_sample_size": 500,
+ "cassandra_storage": {
+  "tablestats": {
+   "cyberguard.events_by_id": {
+    "SSTable count": "7",
+    "Space used (live)": "1318738904",
+    "Space used (total)": "1318738904",
+    "SSTable Compression Ratio": "0.36768",
+    "Number of partitions (estimate)": "5035120",
+    "Memtable data size": "0",
+    "Local read count": "12230702",
+    "Local write count": "6000000",
+    "Bloom filter space used": "6245584",
+    "Index summary off heap memory used": "1096676",
+    "Compacted partition minimum bytes": "43",
+    "Compacted partition maximum bytes": "770",
+    "Compacted partition mean bytes": "705"
+   },
+   "cyberguard.events_by_device_day": {
+    "SSTable count": "3",
+    "Space used (live)": "147629806",
+    "Space used (total)": "147629806",
+    "SSTable Compression Ratio": "0.87483",
+    "Number of partitions (estimate)": "11203",
+    "Memtable data size": "0",
+    "Local read count": "2524",
+    "Local write count": "3000032",
+    "Bloom filter space used": "41560",
+    "Index summary off heap memory used": "8534",
+    "Compacted partition minimum bytes": "61",
+    "Compacted partition maximum bytes": "943127",
+    "Compacted partition mean bytes": "5541"
+   },
+   "cyberguard.events_by_ip_day": {
+    "SSTable count": "5",
+    "Space used (live)": "177629792",
+    "Space used (total)": "177629792",
+    "SSTable Compression Ratio": "0.82965",
+    "Number of partitions (estimate)": "272171",
+    "Memtable data size": "0",
+    "Local read count": "1760",
+    "Local write count": "3000032",
+    "Bloom filter space used": "932720",
+    "Index summary off heap memory used": "175212",
+    "Compacted partition minimum bytes": "51",
+    "Compacted partition maximum bytes": "785939",
+    "Compacted partition mean bytes": "283"
+   },
+   "cyberguard.alerts_by_severity_day": {
+    "SSTable count": "2",
+    "Space used (live)": "12152614",
+    "Space used (total)": "12152614",
+    "SSTable Compression Ratio": "0.87129",
+    "Number of partitions (estimate)": "160",
+    "Memtable data size": "0",
+    "Local read count": "1124",
+    "Local write count": "246263",
+    "Bloom filter space used": "408",
+    "Index summary off heap memory used": "96",
+    "Compacted partition minimum bytes": "51",
+    "Compacted partition maximum bytes": "182785",
+    "Compacted partition mean bytes": "50849"
+   },
+   "system.paxos": {
+    "SSTable count": "3",
+    "Space used (live)": "405268228",
+    "Space used (total)": "405268228",
+    "SSTable Compression Ratio": "0.36550",
+    "Number of partitions (estimate)": "4000909",
+    "Memtable data size": "0",
+    "Local read count": "5326929",
+    "Local write count": "18000045",
+    "Bloom filter space used": "7893328",
+    "Index summary off heap memory used": "877800",
+    "Compacted partition minimum bytes": "73",
+    "Compacted partition maximum bytes": "1109",
+    "Compacted partition mean bytes": "216"
+   },
+   "system.batches": {
+    "SSTable count": "0",
+    "Space used (live)": "0",
+    "Space used (total)": "0",
+    "SSTable Compression Ratio": "-1.00000",
+    "Number of partitions (estimate)": "0",
+    "Memtable data size": "0",
+    "Local read count": "0",
+    "Local write count": "6000032",
+    "Bloom filter space used": "0",
+    "Index summary off heap memory used": "0",
+    "Compacted partition minimum bytes": "0",
+    "Compacted partition maximum bytes": "0",
+    "Compacted partition mean bytes": "0"
+   }
+  },
+  "tablehistograms": {
+   "events_by_device_day": [
+    "Percentile Read Latency Write Latency SSTables Partition Size Cell Count",
+    "50% 2299.00 0.00 5.00 535 1",
+    "95% 4768.00 0.00 5.00 24601 1",
+    "99% 8239.00 0.00 5.00 105778 1",
+    "Max 11864.00 0.00 5.00 943127 1"
+   ],
+   "events_by_ip_day": [
+    "Percentile Read Latency Write Latency SSTables Partition Size Cell Count",
+    "50% 642.00 0.00 2.00 103 1",
+    "95% 4768.00 0.00 4.00 642 1",
+    "99% 5722.00 0.00 4.00 2759 1",
+    "Max 6866.00 0.00 4.00 785939 1"
+   ],
+   "alerts_by_severity_day": [
+    "Percentile Read Latency Write Latency SSTables Partition Size Cell Count",
+    "50% 1109.00 0.00 1.00 29521 1",
+    "95% 2299.00 0.00 1.00 152321 1",
+    "99% 2759.00 0.00 1.00 182785 1",
+    "Max 3973.00 0.00 1.00 182785 1"
+   ]
+  },
+  "du_bytes": {
+   "/var/lib/cassandra/data/cyberguard": 1656592747,
+   "/var/lib/cassandra/data/system": 405426622,
+   "/var/lib/cassandra/commitlog": 67108864
+  },
+  "flushed_before_measure": true
+ },
+ "postgresql_storage": {
+  "tables": [
+   {
+    "relname": "devices",
+    "heap_bytes": 49152,
+    "index_bytes": 40960,
+    "total_bytes": 131072,
+    "n_live_tup": 437,
+    "n_dead_tup": 0,
+    "last_autovacuum": null,
+    "last_autoanalyze": null
+   },
+   {
+    "relname": "event_registry",
+    "heap_bytes": 261742592,
+    "index_bytes": 201555968,
+    "total_bytes": 463388672,
+    "n_live_tup": 5012654,
+    "n_dead_tup": 260,
+    "last_autovacuum": "2026-11-24T05:52:42.740882+00:00",
+    "last_autoanalyze": "2026-11-24T05:55:42.6667+00:00"
+   },
+   {
+    "relname": "events",
+    "heap_bytes": 2304573440,
+    "index_bytes": 1282187264,
+    "total_bytes": 3587424256,
+    "n_live_tup": 5000041,
+    "n_dead_tup": 0,
+    "last_autovacuum": "2026-11-24T05:45:01.846867+00:00",
+    "last_autoanalyze": "2026-11-24T05:55:45.352537+00:00"
+   }
+  ],
+  "index_bytes": {
+   "devices_pkey": 40960,
+   "event_registry_pkey": 201555968,
+   "events_pkey": 199450624,
+   "events_device_time_idx": 369180672,
+   "events_ip_time_idx": 360628224,
+   "events_alert_severity_time_idx": 26484736,
+   "events_time_cover_idx": 326344704
+  },
+  "database_bytes": 4059936435,
+  "first_page_plans": {
+   "q1_hot_device_7d": {
+    "nodes": [
+     {
+      "Node Type": "Limit",
+      "Actual Rows": 101,
+      "Shared Hit Blocks": 95,
+      "Shared Read Blocks": 2
+     },
+     {
+      "Node Type": "Index Only Scan",
+      "Index Name": "events_device_time_idx",
+      "Actual Rows": 101,
+      "Shared Hit Blocks": 95,
+      "Shared Read Blocks": 2
+     }
+    ],
+    "execution_ms": 1.094
+   },
+   "q1_cold_device_7d": {
+    "nodes": [
+     {
+      "Node Type": "Limit",
+      "Actual Rows": 101,
+      "Shared Hit Blocks": 98,
+      "Shared Read Blocks": 1
+     },
+     {
+      "Node Type": "Index Only Scan",
+      "Index Name": "events_device_time_idx",
+      "Actual Rows": 101,
+      "Shared Hit Blocks": 98,
+      "Shared Read Blocks": 1
+     }
+    ],
+    "execution_ms": 0.537
+   },
+   "q2_hot_ipv6_7d": {
+    "nodes": [
+     {
+      "Node Type": "Limit",
+      "Actual Rows": 101,
+      "Shared Hit Blocks": 96,
+      "Shared Read Blocks": 2
+     },
+     {
+      "Node Type": "Index Only Scan",
+      "Index Name": "events_ip_time_idx",
+      "Actual Rows": 101,
+      "Shared Hit Blocks": 96,
+      "Shared Read Blocks": 2
+     }
+    ],
+    "execution_ms": 0.524
+   },
+   "q2_ipv4_1d": {
+    "nodes": [
+     {
+      "Node Type": "Limit",
+      "Actual Rows": 101,
+      "Shared Hit Blocks": 95,
+      "Shared Read Blocks": 1
+     },
+     {
+      "Node Type": "Index Only Scan",
+      "Index Name": "events_ip_time_idx",
+      "Actual Rows": 101,
+      "Shared Hit Blocks": 95,
+      "Shared Read Blocks": 1
+     }
+    ],
+    "execution_ms": 0.701
+   },
+   "q3_hot_severity_2d": {
+    "nodes": [
+     {
+      "Node Type": "Limit",
+      "Actual Rows": 101,
+      "Shared Hit Blocks": 102,
+      "Shared Read Blocks": 0
+     },
+     {
+      "Node Type": "Index Only Scan",
+      "Index Name": "events_alert_severity_time_idx",
+      "Actual Rows": 101,
+      "Shared Hit Blocks": 102,
+      "Shared Read Blocks": 0
+     }
+    ],
+    "execution_ms": 0.679
+   },
+   "q3_severity5_7d": {
+    "nodes": [
+     {
+      "Node Type": "Limit",
+      "Actual Rows": 101,
+      "Shared Hit Blocks": 100,
+      "Shared Read Blocks": 0
+     },
+     {
+      "Node Type": "Index Only Scan",
+      "Index Name": "events_alert_severity_time_idx",
+      "Actual Rows": 101,
+      "Shared Hit Blocks": 100,
+      "Shared Read Blocks": 0
+     }
+    ],
+    "execution_ms": 0.58
+   }
+  }
+ },
+ "kind": "bulk_validation",
+ "dataset": "cyberguard-bulk-v1",
+ "seed": 20261109,
+ "target_events": 5000000,
+ "finished_at_utc": "2026-11-24T09:16:29.392Z",
+ "wall_seconds": 3974.3,
+ "expected": {
+  "content": {
+   "rows": 5000000,
+   "digest": "2a2913ed3f1448d537343958a2686a05"
+  },
+  "device": {
+   "rows": 5000000,
+   "digest": "942af0a6c3e93d76f8d3c75c03a42a42"
+  },
+  "ip": {
+   "rows": 5000000,
+   "digest": "3a185784d5376cd08a270c059fb4a441"
+  },
+  "alert": {
+   "rows": 410557,
+   "digest": "8791340acd938e774e068717bb304116"
+  }
+ },
+ "checks": [
+  {
+   "check": "postgresql: logical events == target",
+   "pass": true,
+   "detail": 5000000
+  },
+  {
+   "check": "postgresql: IDs and full content equal generator",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "postgresql: no duplicated logical event (seq)",
+   "pass": true,
+   "detail": {
+    "dup": 0,
+    "beyond": 0
+   }
+  },
+  {
+   "check": "postgresql: all revisions == 1",
+   "pass": true,
+   "detail": 0
+  },
+  {
+   "check": "postgresql: no active reservation without event",
+   "pass": true,
+   "detail": 0
+  },
+  {
+   "check": "cassandra: events_by_device_day keys equal generator",
+   "pass": true,
+   "detail": {
+    "rows": 5000000,
+    "expected": 5000000
+   }
+  },
+  {
+   "check": "cassandra: events_by_ip_day keys equal generator",
+   "pass": true,
+   "detail": {
+    "rows": 5000000,
+    "expected": 5000000
+   }
+  },
+  {
+   "check": "cassandra: alerts_by_severity_day keys equal generator",
+   "pass": true,
+   "detail": {
+    "rows": 410557,
+    "expected": 410557
+   }
+  },
+  {
+   "check": "cassandra: logical (active) events == target",
+   "pass": true,
+   "detail": 5000000
+  },
+  {
+   "check": "cassandra: IDs and full canonical content equal generator",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "cassandra: no duplicated logical event (seq)",
+   "pass": true,
+   "detail": {
+    "dup": 0,
+    "beyond": 0
+   }
+  },
+  {
+   "check": "cassandra: revisions == 1 and payload ID == key",
+   "pass": true,
+   "detail": 0
+  },
+  {
+   "check": "cassandra: no pending/deleting records",
+   "pass": true,
+   "detail": {}
+  },
+  {
+   "check": "cassandra: live physical rows == 3N + A",
+   "pass": true,
+   "detail": {
+    "live": 15410557,
+    "expected": 15410557
+   }
+  },
+  {
+   "check": "cassandra: measured partition distribution == manifest",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "api: deterministic sample of 500 READs equal in both databases",
+   "pass": true,
+   "detail": {
+    "postgresql": 0,
+    "cassandra": 0
+   }
+  },
+  {
+   "check": "api: q1_hot_device_7d (10000/67624 items) equal and expected",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "api: q1_cold_device_7d (317/317 items) equal and expected",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "api: q2_hot_ipv6_7d (10000/57694 items) equal and expected",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "api: q2_ipv4_1d (10000/43305 items) equal and expected",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "api: q3_hot_severity_2d (10000/12285 items) equal and expected",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "api: q3_severity5_7d (7462/7462 items) equal and expected",
+   "pass": true,
+   "detail": null
+  }
+ ],
+ "passed": true,
+ "note": "Functional validation; durations are observations, not benchmarks."
+}
